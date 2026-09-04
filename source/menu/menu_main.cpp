@@ -1,5 +1,6 @@
 
 #include <unistd.h>
+#include <cwctype>
 #include <fstream>
 #include <sys/stat.h>
 
@@ -113,8 +114,12 @@ void CMenu::_showMain()
 
 void CMenu::_textMain(void)
 {
-	/* same translation key the PLAY button uses, so they always agree */
-	m_btnMgr.setText(m_mainLblPlayHint, _t("gm1", L"Play"));
+	/* same translation key the PLAY button uses, so they always agree,
+	   shown uppercase to match the on-screen hint styling */
+	wstringEx play = _t("gm1", L"Play");
+	for(u32 i = 0; i < play.size(); ++i)
+		play[i] = towupper(play[i]);
+	m_btnMgr.setText(m_mainLblPlayHint, play);
 }
 
 void CMenu::_showTotalGames(const int numberOfGames)
@@ -690,8 +695,8 @@ void CMenu::_initMainMenu()
 	   compiled into the dol so no extra file has to reach the SD card. */
 	TexData texAButton;
 	TexHandle.fromPNG(texAButton, a_button_png);
-	m_mainLblAGlyph = _addLabel("MAIN/A_GLYPH", theme.txtFont, L"", 262, 408, 48, 48, theme.txtFontColor, 0, texAButton);
-	m_mainLblPlayHint = _addLabel("MAIN/PLAY_HINT", theme.txtFont, L"", 318, 408, 120, 48, theme.txtFontColor, FTGX_JUSTIFY_LEFT | FTGX_ALIGN_MIDDLE);
+	m_mainLblAGlyph = _addLabel("MAIN/A_GLYPH", theme.btnFont, L"", 398, 396, 52, 52, CColor(0xFFFFFFFF), 0, texAButton);
+	m_mainLblPlayHint = _addLabel("MAIN/PLAY_HINT", theme.btnFont, L"", 458, 396, 170, 52, CColor(0xFFFFFFFF), FTGX_JUSTIFY_LEFT | FTGX_ALIGN_MIDDLE);
 
 	m_mainBtnNext = _addPicButton("MAIN/NEXT_BTN", texNext, texNextS, 540, 146, 80, 80);
 	m_mainBtnPrev = _addPicButton("MAIN/PREV_BTN", texPrev, texPrevS, 20, 146, 80, 80);
