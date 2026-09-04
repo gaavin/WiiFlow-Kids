@@ -65,16 +65,20 @@ CMenu::CMenu()
 	m_base_font_size = 0;
 	m_wbf1_font = NULL;
 	m_wbf2_font = NULL;
-	m_current_view = COVERFLOW_WII;
+	m_current_view = KIDS_VIEW;// Kids UI: combined Wii + GameCube coverflow
 	m_prevBg = NULL;
 	m_nextBg = NULL;
 	m_lqBg = NULL;
 	m_use_sd_logging = false;
 	m_use_wifi_gecko = false;
 	//m_init_network = false;
-	m_use_source = true;
+	m_use_source = false;// Kids UI: source menu / sourceflow stripped
 	m_sourceflow = false;
-	m_clearCats = false;
+	/* Kids UI: clear category filters on boot too. The categories button is
+	   stripped from both screens, so a stale selected/required category would
+	   otherwise permanently hide games from the child. Hidden categories are
+	   deliberately left alone so a parent can still keep titles out of sight. */
+	m_clearCats = true;
 	m_getFavs = true;
 	m_catStartPage = 1;
 	cacheCovers = false;

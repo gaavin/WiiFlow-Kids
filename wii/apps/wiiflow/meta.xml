@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 	<app version="1">
-		<name>WiiFlow WFL</name>
-		<coder>Fledge68</coder>
-		<version>5.5.4</version>
-		<release_date>20230920000000</release_date>
+		<name>WiiFlow Kids</name>
+		<coder>Fledge68 (WiiFlow Lite) - Kids UI fork</coder>
+		<version>5.5.4-kids</version>
+		<release_date>20260904000000</release_date>
 		<!--   // remove this line to enable arguments
 		<arguments>
 			<arg>ios=249</arg>
@@ -12,16 +12,20 @@
 			<arg>noflash</arg>
 		</arguments>
 		// remove this line to enable arguments -->
-		<short_description>USB Loader app</short_description>
-		<long_description>WiiFlow is a app for loading backup games from a USB Device or SD card.
-    It displays your games in a coverflow with 3D full box covers.
-    
-    Key features:
-    * Emulated NAND support
-    * Plugin system for emu apps
-    * Devolution support
-    * Nintendont support
-    * Neek2o support
+		<short_description>Simple game loader for kids</short_description>
+		<long_description>WiiFlow Kids is a fork of WiiFlow Lite with a deliberately simplified
+    interface, intended for a young child to use unsupervised.
+
+    All Wii and GameCube games appear together in one single coverflow.
+    There is no source menu, no view switching, and no settings, categories,
+    favorites or delete buttons on the child's screens.
+
+    Point at a game, press A, then press PLAY. That is the whole interface.
+
+    The HOME button still opens the full WiiFlow menu, so a parent keeps
+    access to settings, downloads and game configuration.
+
+    Based on WiiFlow Lite by Fledge68.
 		</long_description>
 		<no_ios_reload/>
 	</app>

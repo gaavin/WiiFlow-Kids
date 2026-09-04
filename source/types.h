@@ -33,6 +33,10 @@ enum {
 	COVERFLOW_MAX		= 0xFF
 };
 
+/* Kids UI: the single combined coverflow the child sees.
+   m_current_view is a bitmask, so Wii and GameCube games load into one list. */
+#define KIDS_VIEW		(COVERFLOW_WII | COVERFLOW_GAMECUBE)
+
 enum
 {
 	TYPE_WII_DISC = 0,

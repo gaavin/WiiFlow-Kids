@@ -201,23 +201,15 @@ private:
 	TexData m_mainCustomBg[2];
 	
 // Main Coverflow
-	s16 m_mainBtnCategories;
-	s16 m_mainBtnConfig;
+	/* Kids UI: the view-switch, categories, favorites, config and DVD buttons
+	   are stripped. Only HOME (parent escape hatch) and the page arrows remain. */
 	s16 m_mainBtnHome;
-	s16 m_mainBtnFavoritesOn;
-	s16 m_mainBtnFavoritesOff;
 	s16 m_mainLblCurMusic;
 	s16 m_mainLblLetter;
 	s16 m_mainLblNotice;
 	s16 m_mainLblMessage;
 	s16 m_mainBtnNext;
 	s16 m_mainBtnPrev;
-	s16 m_mainBtnDVD;
-	s16 m_mainBtnGamecube;
-	s16 m_mainBtnPlugin;
-	s16 m_mainBtnWii;
-	s16 m_mainBtnChannel;
-	s16 m_mainBtnHomebrew;
 	s16 m_mainLblUser[6];
 	s16 m_mem1FreeSize;
 	s16 m_mem2FreeSize;
@@ -354,11 +346,8 @@ private:
 		LOAD_IOS_SUCCEEDED,
 		LOAD_IOS_NOT_NEEDED
 	};
-	s16 m_gameBtnFavoriteOn;
-	s16 m_gameBtnFavoriteOff;
-	s16 m_gameBtnCategories;
-	s16 m_gameBtnDelete;
-	s16 m_gameBtnSettings;
+	/* Kids UI: favorites, categories, delete and settings are stripped from
+	   the game screen - only PLAY and BACK remain. */
 	s16 m_gameBtnPlay;
 	s16 m_gameBtnBack;
 	s16 m_gameLblUser[5];
