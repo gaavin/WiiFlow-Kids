@@ -484,7 +484,7 @@ void CMenu::_game(bool launch)
 			}
 			else
 			{
-				if((!Auto_hide_icons || m_show_zone_game) && !m_soundThrdBusy)
+				if(!m_soundThrdBusy)// Kids UI: PLAY/BACK are always on screen
 				{
 					m_btnMgr.show(m_gameBtnPlay);
 					m_btnMgr.show(m_gameBtnBack);

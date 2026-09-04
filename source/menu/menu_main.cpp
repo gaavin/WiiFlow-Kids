@@ -233,6 +233,24 @@ void CMenu::_showCF(bool refreshList)
 			/* fail */
 			m_source_autoboot = false;
 		}
+		/* Kids UI: the coverflow only ever draws .wfc cache files, so cover art
+		   copied onto the SD card by hand stays invisible until it is converted.
+		   There is no settings UI left to trigger that, so detect it here: if any
+		   game has artwork on the card but no cached texture, convert now. */
+		if(!cacheCovers)
+		{
+			for(vector<dir_discHdr>::iterator it = m_gameList.begin(); it != m_gameList.end(); ++it)
+			{
+				const char *fn_id = CoverFlow.getFilenameId(&(*it));
+				if(fn_id == NULL || fsop_FileExist(fmt("%s/%s.wfc", m_cacheDir.c_str(), fn_id)))
+					continue;
+				if(fsop_FileExist(getBoxPath(&(*it))) || fsop_FileExist(getFrontPath(&(*it))))
+				{
+					cacheCovers = true;
+					break;
+				}
+			}
+		}
 		if(cacheCovers)
 		{
 			cacheCovers = false;
@@ -352,7 +370,9 @@ int CMenu::main(void)
 	string prevTheme = m_themeName;
 	m_reload = false;
 	CFLocked = m_cfg.getBool("GENERAL", "cf_locked", false);
-	Auto_hide_icons = m_cfg.getBool("GENERAL", "auto_hide_icons", true);
+	/* Kids UI: never fade icons in and out on hover - a child should not have
+	   to discover controls by waving the pointer around. */
+	Auto_hide_icons = false;
 
 	/* Kids UI: one screen, always. Wii and GameCube games share a single
 	   coverflow and the child cannot switch away from it. */
@@ -617,12 +637,12 @@ int CMenu::main(void)
 			}
 		}
 		/*zones, showing and hiding buttons */
-		if(!m_gameList.empty() && m_show_zone_prev && !m_sourceflow)
+		if(!m_gameList.empty())
 			m_btnMgr.show(m_mainBtnPrev);
 		else
 			m_btnMgr.hide(m_mainBtnPrev);
 			
-		if(!m_gameList.empty() && m_show_zone_next && !m_sourceflow)
+		if(!m_gameList.empty())
 			m_btnMgr.show(m_mainBtnNext);
 		else
 			m_btnMgr.hide(m_mainBtnNext);
@@ -751,6 +771,7 @@ void CMenu::_initMainMenu()
 	_setHideAnim(m_mem1FreeSize, "MEM1", 0, 0, 0.f, 0.f);
 	_setHideAnim(m_mem2FreeSize, "MEM2", 0, 0, 0.f, 0.f);
 //#endif
+	_textMain();
 	_hideMain(true);
 }
 

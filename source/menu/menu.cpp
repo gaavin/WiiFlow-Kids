@@ -1274,12 +1274,6 @@ void CMenu::_buildMenus(void)
 	_loadCFCfg();
 }
 
-void CMenu::_updateText(void)
-{
-	_textGame();
-	_textMain();
-}
-
 
 typedef struct
 {

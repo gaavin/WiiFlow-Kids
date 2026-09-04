@@ -699,7 +699,6 @@ private:
 	const char *_domainFromView(void);
 	void _showWaitMessage();
 	void _hideWaitMessage();
-	void _updateText(void);
 	const wstringEx _t(const char *key, const wchar_t *def = L"") { return m_loc.getWString(m_curLanguage, key, def); }
 	const wstringEx _fmt(const char *key, const wchar_t *def);
 	wstringEx _getNoticeTranslation(int sorting, wstringEx curLetter);
