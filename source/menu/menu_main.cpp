@@ -23,7 +23,6 @@ void CMenu::_hideMain(bool instant)
 {
 	m_btnMgr.hide(m_mainBtnNext, instant);
 	m_btnMgr.hide(m_mainBtnPrev, instant);
-	m_btnMgr.hide(m_mainBtnHome, instant);
 	m_btnMgr.hide(m_mainLblMessage, instant);
 	m_btnMgr.hide(m_mainLblLetter, instant);
 	m_btnMgr.hide(m_mainLblNotice, instant);
@@ -34,9 +33,6 @@ void CMenu::_hideMain(bool instant)
 
 void CMenu::_getCustomBgTex()
 {
-	if(m_sourceflow)
-		_getSFlowBgTex();
-	else
 	{
 		curCustBg = loopNum(curCustBg + 1, 2);
 		string fn = "";
@@ -225,7 +221,6 @@ void CMenu::_showCF(bool refreshList)
 		if(cacheCovers)
 		{
 			cacheCovers = false;
-			if(!m_sourceflow || _sfCacheCoversNeeded() > 0)
 			{
 				m_btnMgr.setProgress(m_downloadPBar, 0.f, true);
 				m_btnMgr.setText(m_downloadLblMessage, L"0%");
@@ -239,8 +234,6 @@ void CMenu::_showCF(bool refreshList)
 				_stop_pThread();
 				m_btnMgr.setText(m_downloadLblDialog, _t("dlmsg14", L"Done."));
 				u8 pause = 150;
-				if(m_sourceflow)
-					pause = 1;
 				do
 				{
 					_mainLoopCommon();
@@ -381,35 +374,13 @@ int CMenu::main(void)
 		/* Main Loop */
 		_mainLoopCommon(true);
 
-		if(BTN_HOME_PRESSED || (BTN_A_PRESSED && m_btnMgr.selected(m_mainBtnHome)))
+		if(BTN_HOME_PRESSED)
 		{
-			/* Kids UI: HOME is the only way out of the child screen - the parent's
-			   escape hatch into the full WiiFlow menu. */
+			/* Kids UI: there is no Home menu any more. HOME just leaves WiiFlow,
+			   so the console is never stuck in the loader with no way out. */
 			_hideMain();
-			if(_Home())
-				break;// if exit or shutdown option was selected then exit wiiflow
-			if(prevTheme != m_themeName)
-			{
-				/* new theme - exit wiiflow and reload */
-				m_reload = true;
-				break;
-			}
-			/* whatever the parent did in the Home menu, the child always comes
-			   back to the single combined Wii + GameCube coverflow */
-			if(m_current_view != KIDS_VIEW)
-			{
-				m_current_view = KIDS_VIEW;
-				m_refreshGameList = true;
-			}
-			if(m_refreshGameList)
-			{
-				m_refreshGameList = false;
-				_getCustomBgTex();
-				_setMainBg();
-				_showCF(true);
-			}
-			else
-				_showMain();
+			exitHandler(m_cfg.getInt("GENERAL", "exit_to", EXIT_TO_MENU));
+			break;
 		}
 		else if(BTN_A_PRESSED)
 		{
@@ -641,18 +612,16 @@ int CMenu::main(void)
 		else
 			m_btnMgr.hide(m_mainBtnNext);
 			
-		/* Kids UI: only HOME remains on the main screen. */
+		/* Kids UI: no buttons on the main screen at all - just covers. */
 		if(!Auto_hide_icons || m_show_zone_main)
 		{
 			m_btnMgr.show(m_mainLblUser[0]);
 			m_btnMgr.show(m_mainLblUser[1]);
-			m_btnMgr.show(m_mainBtnHome);
 		}
 		else
 		{
 			m_btnMgr.hide(m_mainLblUser[0]);
 			m_btnMgr.hide(m_mainLblUser[1]);
-			m_btnMgr.hide(m_mainBtnHome);
 		}
 		for(int chan = WPAD_MAX_WIIMOTES-1; chan >= 0; chan--)
 		{
@@ -679,8 +648,6 @@ int CMenu::main(void)
 
 void CMenu::_initMainMenu()
 {
-	TexData texHome;
-	TexData texHomeS;
 	TexData texPrev;
 	TexData texPrevS;
 	TexData texNext;
@@ -693,8 +660,6 @@ void CMenu::_initMainMenu()
 	if(m_theme.loaded() && TexHandle.fromImageFile(bgLQ, fmt("%s/%s", m_themeDataDir.c_str(), m_theme.getString("MAIN/BG", "texture").c_str()), GX_TF_CMPR, 64, 64) == TE_OK)
 		m_mainBgLQ = bgLQ;
 
-	TexHandle.fromImageFile(texHome, fmt("%s/btnquit.png", m_imgsDir.c_str()));// home button
-	TexHandle.fromImageFile(texHomeS, fmt("%s/btnquits.png", m_imgsDir.c_str()));
 	TexHandle.fromImageFile(texPrev, fmt("%s/btnprev.png", m_imgsDir.c_str()));
 	TexHandle.fromImageFile(texPrevS, fmt("%s/btnprevs.png", m_imgsDir.c_str()));
 	TexHandle.fromImageFile(texNext, fmt("%s/btnnext.png", m_imgsDir.c_str()));
@@ -703,9 +668,6 @@ void CMenu::_initMainMenu()
 
 	_addUserLabels(m_mainLblUser, ARRAY_SIZE(m_mainLblUser), "MAIN");
 
-	/* Kids UI: HOME is the only main-screen button, so centre it. */
-	m_mainBtnHome = _addPicButton("MAIN/QUIT_BTN", texHome, texHomeS, 296, 400, 48, 48);
-	
 	m_mainBtnNext = _addPicButton("MAIN/NEXT_BTN", texNext, texNextS, 540, 146, 80, 80);
 	m_mainBtnPrev = _addPicButton("MAIN/PREV_BTN", texPrev, texPrevS, 20, 146, 80, 80);
 
@@ -749,7 +711,6 @@ void CMenu::_initMainMenu()
 	//
 	_setHideAnim(m_mainBtnNext, "MAIN/NEXT_BTN", 0, 0, 0.f, 0.f);
 	_setHideAnim(m_mainBtnPrev, "MAIN/PREV_BTN", 0, 0, 0.f, 0.f);
-	_setHideAnim(m_mainBtnHome, "MAIN/QUIT_BTN", 0, 40, 0.f, 0.f);
 	_setHideAnim(m_mainLblMessage, "MAIN/MESSAGE", 0, 0, 0.f, 0.f);
 	_setHideAnim(m_mainLblLetter, "MAIN/LETTER", 0, 0, 0.f, 0.f);
 	_setHideAnim(m_mainLblNotice, "MAIN/NOTICE", 0, 0, 0.f, 0.f);
@@ -866,9 +827,7 @@ void CMenu::exitHandler(int ExitTo)
 
 int CMenu::_getCFVersion()
 {
-	if(m_sourceflow)
-		return _getSrcFlow();
-	else if(m_current_view == COVERFLOW_PLUGIN)
+	if(m_current_view == COVERFLOW_PLUGIN)
 	{
 		int first = 0;
 		for(u8 i = 0; m_plugin.PluginExist(i); ++i)
@@ -894,9 +853,7 @@ int CMenu::_getCFVersion()
 
 void CMenu::_setCFVersion(int version)
 {
-	if(m_sourceflow)
-		_setSrcFlow(version);
-	else if(m_current_view == COVERFLOW_PLUGIN)
+	if(m_current_view == COVERFLOW_PLUGIN)
 	{
 		int first = 0;
 		for(u8 i = 0; m_plugin.PluginExist(i); ++i)

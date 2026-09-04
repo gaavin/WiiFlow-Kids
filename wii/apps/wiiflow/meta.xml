@@ -13,17 +13,17 @@
 		</arguments>
 		// remove this line to enable arguments -->
 		<short_description>Simple game loader for kids</short_description>
-		<long_description>WiiFlow Kids is a fork of WiiFlow Lite with a deliberately simplified
-    interface, intended for a young child to use unsupervised.
+		<long_description>WiiFlow Kids is a fork of WiiFlow Lite stripped down to a single
+    screen a young child can use on their own.
 
-    All Wii and GameCube games appear together in one single coverflow.
-    There is no source menu, no view switching, and no settings, categories,
-    favorites or delete buttons on the child's screens.
+    All Wii and GameCube games appear together in one coverflow. Point at a
+    game, press A, then press PLAY. That is the whole interface.
 
-    Point at a game, press A, then press PLAY. That is the whole interface.
+    The old WiiFlow menus - source, settings, categories, favorites, delete,
+    downloads, WAD manager, NAND emulation, disc dumping - are removed from
+    the build entirely, not just hidden. HOME simply exits WiiFlow.
 
-    The HOME button still opens the full WiiFlow menu, so a parent keeps
-    access to settings, downloads and game configuration.
+    There is no settings UI: configure by editing wiiflow.ini by hand.
 
     Based on WiiFlow Lite by Fledge68.
 		</long_description>

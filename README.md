@@ -1,46 +1,71 @@
 # WiiFlow Kids
 
-A fork of [WiiFlow Lite](https://github.com/Fledge68/WiiFlow_Lite) with a
-deliberately stripped-down interface, meant for a young child to use on their own.
+A fork of [WiiFlow Lite](https://github.com/Fledge68/WiiFlow_Lite) stripped down
+to a single screen a young child can use on their own.
 
-## What is different
+## The whole interface
 
-**One screen, all the games.** Wii and GameCube games are combined into a single
-coverflow. Upstream keeps them in separate views that you switch between with a
-button; here `m_current_view` is pinned to `COVERFLOW_WII | COVERFLOW_GAMECUBE`
-(`KIDS_VIEW` in `source/types.h`). WiiFlow's game list loader is already a
-bitmask, so both lists load together, and `_launch()` picks the right loader per
-game from `hdr->type`.
+Point at a game, press **A**, press **PLAY**. That is all of it.
 
-**Two presses to play.** Point at a cover, press A, press PLAY. That is the
-entire interface a child sees.
+Wii and GameCube games appear together in one coverflow. There is no source
+menu, no view switching, no settings, no categories, no favorites, no delete.
+Pressing HOME simply exits WiiFlow.
 
-**Stripped from the main screen:** the view-switch button (Wii/GameCube/Channels/
-Emulators/Homebrew), categories, favorites, settings, and the DVD boot button.
-The source menu and sourceflow are gone entirely, including the B-held shortcut
-that opened them. Only HOME and the page arrows remain.
+## What was removed
 
-**Stripped from the game screen:** favorites, categories, settings, delete, and
-the banner toggle. Only PLAY and BACK remain, enlarged for small hands.
+The old WiiFlow UI is gone from the build, not merely hidden. These files were
+deleted outright:
 
-**Safety rails.** Because the buttons that toggle them are gone, favorites
-filtering is forced off and category filters are cleared on boot — otherwise a
-stale filter could leave the child looking at an empty screen with no way to fix
-it. Hidden categories are deliberately *not* cleared, so a parent can still keep
-particular titles out of sight.
+    menu_about        menu_config_gc        menu_paths
+    menu_categories   menu_config_gc_game   menu_plugin
+    menu_cftheme      menu_config_hb        menu_sm_editor
+    menu_cheat        menu_config_main      menu_source
+    menu_code         menu_config_source    menu_wad
+    menu_config_boot  menu_explorer         menu_wbfs
+    menu_config_coverbnr  menu_gameinfo     menu_partitions
+    menu_config_game  gc_disc_dump (GameCube disc dumping)
 
-## For the parent
+Three files were reduced to the non-UI helpers the child's screen still needs,
+and renamed to match what they now are:
 
-The **HOME button still opens the full WiiFlow menu**, so settings, downloads and
-per-game configuration all remain available. Whatever you change in there, the
-child's screen always returns to the combined Wii + GameCube coverflow.
+  - `menu_download.cpp` -> `menu_network.cpp` — network bring-up, plus the
+    worker thread and progress bar shown while covers are cached on first boot
+  - `menu_home.cpp` -> `menu_covercache.cpp` — cover PNG to `.wfc` conversion
+  - `menu_nandemu.cpp` -> `menu_emunand.cpp` — locating the emuNAND partition
+    and checking for saves, which booting a game still needs
 
-Channels, emulator plugins and homebrew are excluded from the child's coverflow.
-They are not deleted — they are simply not part of `KIDS_VIEW`.
+Also removed: 179 dead method declarations and 102 dead widget members from
+`menu.hpp`.
+
+## How the combined list works
+
+`m_current_view` is a bitmask, so pinning it to
+`KIDS_VIEW = COVERFLOW_WII | COVERFLOW_GAMECUBE` (see `source/types.h`) makes
+`_loadGameList()` load both lists into one coverflow. `_launch()` re-derives the
+storage partition from each game's own `hdr->type` before booting, so a mixed
+list boots correctly — the same mechanism upstream's `directlaunch()` relies on.
+
+## Safety rails
+
+Favorites filtering is forced off and category filters are cleared on boot.
+The buttons that toggle them no longer exist, so a stale filter would otherwise
+strand the child on an empty coverflow with no way to recover. Hidden categories
+are deliberately left intact, so a parent can still keep titles out of sight.
+
+## Configuring it
+
+There is no settings UI. Edit `wiiflow.ini` on the SD card by hand, or run a
+stock WiiFlow build once to set things up.
 
 ## Building
 
-Needs devkitPPC + libogc, same as upstream. `make` from the repository root.
+Built by GitHub Actions on every push (`.github/workflows/build.yml`) using the
+`devkitpro/devkitppc` image; download `boot.dol` or the ready-to-copy
+`apps/wiiflow` folder from the run's artifacts.
+
+Locally: devkitPPC + libogc, then `make` from the repository root. Everything
+else (libpng, freetype, wolfSSL, custom fat/ntfs/ext2) is vendored in `portlibs/`
+and `source/libwolfssl/`; only `libmad` comes from devkitPro's package repo.
 
 ---
 

@@ -312,19 +312,6 @@ void CMenu::_game(bool launch)
 				break;
 			}
 		}
-		/* display game info screen */
-		else if(BTN_PLUS_PRESSED && hdr->type != TYPE_HOMEBREW && hdr->type != TYPE_SOURCE && !coverFlipped && !m_video_playing)
-		{
-			_hideGame();
-			m_banner.SetShowBanner(false);
-			m_gameSelected = false;
-			launch = _gameinfo();
-			m_gameSelected = true;
-			_showGame();
-			if(m_newGame)
-				startGameSound = -10;
-			m_banner.SetShowBanner(true);
-		}
 		/* play or stop a trailer video */
 		else if(BTN_MINUS_PRESSED && !coverFlipped)
 		{

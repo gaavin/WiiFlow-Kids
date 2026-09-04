@@ -27,19 +27,9 @@ void CMenu::_showError(void)
 void CMenu::_error(const wstringEx &msg)
 {
 	SetupInput();
-	_hideAbout();
-	_hideCode();
-	_hideConfigMain();
-	_hideConfigGCGame();
 	_hideDownload();
-	_hideExitTo();
 	_hideGame();
 	_hideMain();
-	_hideWBFS();
-	_hideCFTheme();
-	_hideCategorySettings();
-	_hideGameInfo();
-	_hideConfigGame();
 	_hideWaitMessage();
 	m_btnMgr.setText(m_errorLblMessage, msg);
 	_showError();

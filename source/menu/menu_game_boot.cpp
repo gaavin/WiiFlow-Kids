@@ -1017,7 +1017,7 @@ void CMenu::_launchChannel(dir_discHdr *hdr)
 	Sys_Exit();
 }
 
-void CMenu::_launchWii(dir_discHdr *hdr, bool dvd, bool disc_cfg)
+void CMenu::_launchWii(dir_discHdr *hdr, bool dvd)
 {
 	if(dvd)
 	{
@@ -1053,10 +1053,6 @@ void CMenu::_launchWii(dir_discHdr *hdr, bool dvd, bool disc_cfg)
 				/* load game configs - gameconfig2.ini */
 				m_gcfg2.load(fmt("%s/" GAME_SETTINGS2_FILENAME, m_settingsDir.c_str()));
 				
-				/* go to game settings menu if wanted to make changes */
-				if(disc_cfg)
-					_configGCGame(hdr, dvd);
-				
 				/* prepare to launch GC disc */
 				MusicPlayer.Stop();
 				m_cfg.setInt("GENERAL", "cat_startpage", m_catStartPage);
@@ -1076,10 +1072,6 @@ void CMenu::_launchWii(dir_discHdr *hdr, bool dvd, bool disc_cfg)
 			
 			/* load game configs - gameconfig2.ini */
 			m_gcfg2.load(fmt("%s/" GAME_SETTINGS2_FILENAME, m_settingsDir.c_str()));
-			
-			/* go to game settings menu if wanted to make changes */
-			if(disc_cfg)
-				_configGame(hdr, dvd);
 			
 			/* prepare to launch Wii disc */
 			MusicPlayer.Stop();

@@ -22,7 +22,6 @@
 #include "list/ListGenerator.hpp"
 #include "loader/disc.h"
 #include "loader/sys.h"
-#include "loader/gc_disc_dump.hpp"
 #include "loader/wbfs.h"
 #include "music/gui_sound.h"
 #include "music/MusicPlayer.hpp"
@@ -51,7 +50,6 @@ public: // functions called from outside CMenu
 	// gc_disc_dump
 	u64 m_thrdTotal;
 	void update_pThread(u64 amount, bool add = true);
-	void GC_Messenger(int message, int info, char *cinfo);
 	
 	// proxy settings
 	bool proxyUseSystem;
@@ -122,7 +120,6 @@ private:
 	bool m_source_autoboot;
 	dir_discHdr m_autoboot_hdr;
 	s16 m_showtimer;
-	s16 m_musicTimer;
 	string m_curLanguage;
 	string m_themeName;
 
@@ -201,9 +198,8 @@ private:
 	TexData m_mainCustomBg[2];
 	
 // Main Coverflow
-	/* Kids UI: the view-switch, categories, favorites, config and DVD buttons
-	   are stripped. Only HOME (parent escape hatch) and the page arrows remain. */
-	s16 m_mainBtnHome;
+	/* Kids UI: every main-screen button is stripped. Only the coverflow and
+	   its page arrows remain; the physical HOME button exits WiiFlow. */
 	s16 m_mainLblCurMusic;
 	s16 m_mainLblLetter;
 	s16 m_mainLblNotice;
@@ -221,57 +217,24 @@ private:
 #endif
 
 // Main Config menus
-	s16 m_configLblPage;
-	s16 m_configBtnPageM;
-	s16 m_configBtnPageP;
-	s16 m_configBtnBack;
-	s16 m_configLblTitle;	
 	s16 m_configLblUser[4];
 	
-	s16 m_configLbl1;
-	s16 m_configLbl2;
-	s16 m_configLbl3;
-	s16 m_configLbl4;
 
-	s16 m_configBtn1;
-	s16 m_configBtn2;
-	s16 m_configBtn3;
-	s16 m_configBtn4;
 
-	s16 m_configLbl1Val;
-	s16 m_configBtn1M;
-	s16 m_configBtn1P;
 
-	s16 m_configLbl2Val;
-	s16 m_configBtn2M;
-	s16 m_configBtn2P;
 
-	s16 m_configLbl3Val;
-	s16 m_configBtn3M;
-	s16 m_configBtn3P;
 
-	s16 m_configLbl4Val;
-	s16 m_configBtn4M;
-	s16 m_configBtn4P;
 
 // checkbox menus
 	s16 m_checkboxLblTxt[11];
 	s16 m_checkboxBtn[11];
 
 // Download menu
-	s16 m_downloadLblTitle;
-	s16 m_downloadBtnBack;
-	s16 m_downloadLblGameTDB;
 	s16 m_downloadLblUser[4];
 	s16 m_downloadPBar;
 	s16 m_downloadLblMessage;
 	s16 m_downloadLblDialog;
 	//download cover settings
-	s16 m_downloadLblCoverPrio;
-	s16 m_downloadLblPrio;
-	s16 m_downloadBtnPrioM;
-	s16 m_downloadBtnPrioP;
-	s16 m_downloadPrioVal;
 	enum CoverPrio
 	{
 		C_TYPE_PRIOA = (1<<0),//C_TYPE_ACUSTM
@@ -299,7 +262,6 @@ private:
 		FLAT,
 		CFLAT,
 	};
-	s16 m_downloadLblRegion;
 	enum Regions
 	{
 		EN = 1,
@@ -315,30 +277,6 @@ private:
 		ZHCN,
 		AU,
 	};
-	s16 m_downloadBtnEN;
-	s16 m_downloadBtnJA;
-	s16 m_downloadBtnFR;
-	s16 m_downloadBtnDE;
-	s16 m_downloadBtnES;
-	s16 m_downloadBtnIT;
-	s16 m_downloadBtnNL;
-	s16 m_downloadBtnPT;
-	s16 m_downloadBtnRU;
-	s16 m_downloadBtnKO;
-	s16 m_downloadBtnZHCN;
-	s16 m_downloadBtnAU;
-	s16 m_downloadBtnENs;
-	s16 m_downloadBtnJAs;
-	s16 m_downloadBtnFRs;
-	s16 m_downloadBtnDEs;
-	s16 m_downloadBtnESs;
-	s16 m_downloadBtnITs;
-	s16 m_downloadBtnNLs;
-	s16 m_downloadBtnPTs;
-	s16 m_downloadBtnRUs;
-	s16 m_downloadBtnKOs;
-	s16 m_downloadBtnZHCNs;
-	s16 m_downloadBtnAUs;
 // Game menu
 	enum
 	{
@@ -357,17 +295,9 @@ private:
 	s16 m_promptBtnChoice1;
 	s16 m_promptBtnChoice2;
 // Parental code menu
-	s16 m_codeLblTitle;
 	s16 m_codeBtnKey[10];
-	s16 m_codeBtnBack;
-	s16 m_codeBtnErase;
 	s16 m_codeLblUser[4];
 // wbfs menu 
-	s16 m_wbfsLblTitle;
-	s16 m_wbfsPBar;
-	s16 m_wbfsBtnGo;
-	s16 m_wbfsLblDialog;
-	s16 m_wbfsLblMessage;
 	s16 m_wbfsLblUser[4];
 	enum WBFS_OP
 	{
@@ -377,16 +307,6 @@ private:
 		WO_COPY_GAME,
 	};
 //coverflow adjust menu
-	s16 m_cfThemeBtnAlt;
-	s16 m_cfThemeBtnSelect;
-	s16 m_cfThemeBtnWide;
-	s16 m_cfThemeLblParam;
-	s16 m_cfThemeBtnParamM;
-	s16 m_cfThemeBtnParamP;
-	s16 m_cfThemeBtnCopy;
-	s16 m_cfThemeBtnPaste;
-	s16 m_cfThemeBtnSave;
-	s16 m_cfThemeBtnCancel;
 	s16 m_cfThemeLblVal[4 * 4];
 	s16 m_cfThemeBtnValM[4 * 4];
 	s16 m_cfThemeBtnValP[4 * 4];
@@ -418,40 +338,15 @@ private:
 	};
 	static const SCFParamDesc _cfParams[];
 //Game Settings menus
-	s16 m_gameSettingsLblPage;
-	s16 m_gameSettingsBtnPageM;
-	s16 m_gameSettingsBtnPageP;
-	s16 m_gameSettingsBtnBack;
-	s16 m_gameSettingsLblTitle;
 	s16 m_gameSettingsLblUser[3 * 2];
 //Cheat menu
-	s16 m_cheatBtnBack;
-	s16 m_cheatBtnApply;
-	s16 m_cheatBtnDownload;
-	s16 m_cheatLblTitle;
-	s16 m_cheatLblPage;
-	s16 m_cheatBtnPageM;
-	s16 m_cheatBtnPageP;
 	s16 m_cheatLblItem[4];
 	s16 m_cheatBtnItem[4];
 	s16 m_cheatLblUser[4];
 // Gameinfo menu
-	s16 m_gameinfoLblTitle;
-	s16 m_gameinfoLblID;
-	s16 m_gameinfoLblSynopsis;
-	s16 m_gameinfoLblDev;
-	s16 m_gameinfoLblRegion;
-	s16 m_gameinfoLblPublisher;
-	s16 m_gameinfoLblRlsdate;
-	s16 m_gameinfoLblGenre;
-	s16 m_gameinfoLblRating;
-	s16 m_gameinfoLblWifiplayers;
 	s16 m_gameinfoLblUser[5];
 	s16 m_gameinfoLblControlsReq[4];
 	s16 m_gameinfoLblControls[4];
-	s16 m_gameinfoLblSnap;
-	s16 m_gameinfoLblCartDisk;
-	s16 m_gameinfoLblOverlay;
 	s16 m_gameLblSnap;
 	s16 m_gameLblOverlay;
 	TexData m_game_snap;
@@ -693,169 +588,30 @@ private:
 // Menu Inits
 	void _initMainMenu();
 	void _initErrorMenu();
-	void _initConfigMenu();
-	void _initConfigGCMenu();
-	void _initConfigSrc();
-	void _initConfigHB();
-	void _initBoot(void);
-	void _initNandEmuMenu();
-	void _initPartitionsCfgMenu();
-	void _initPathsMenu();
 	void _initDownloadMenu();
-	void _initCodeMenu();
-	void _initCFThemeMenu();
 	void _initGameMenu();
-	void _initGameInfoMenu();
-	void _initConfigGameMenu();
-	void _initCheatSettingsMenu();
-	void _initCoverBanner();
-	void _initWBFSMenu();
-	void _initCategorySettingsMenu();
-	void _initHomeAndExitToMenu();
-	void _initAboutMenu();
-	void _initExplorer();
-	void _initWad();
-	void _initSourceMenu();
-	void _initPluginSettingsMenu();
-	void _initCheckboxesMenu();
 // menu texts
 	void _textError(void);
-	void _textConfig(void);
-	void _textConfigGC(void);
-	void _textConfigSrc(void);
-	void _textConfigHB(void);
-	void _textBoot(void);
-	void _textNandEmu(void);
-	void _textPartitionsCfg(void);
-	void _textPaths(void);
-	void _textDownload(void);
-	void _textCode(void);
 	void _textGame(void);
-	void _textGameInfo(void);
-	void _textConfigGame(void);
-	void _textCheatSettings(void);
-	void _textCoverBanner(void);
-	void _textWBFS(void);
-	void _textCategorySettings(void);
-	void _textHome(void);
-	void _textExitTo(void);
-	void _textShutdown(void);
-	void _textAbout(void);
-	void _textExplorer(void);
-	void _textWad(void);
-	void _textSource(void);
-	void _textPluginSettings(void);
-	void _textCheckboxesMenu(void);
 // menu hides
 	void _hideMain(bool instant = false);
 	void _hideError(bool instant = false);
-	void _hideConfigMain(bool instant = true);
-	void _hideConfigButtons(bool instant = true);
-	void _hideConfigGC(bool instant = true);
-	void _hideConfigSrc(bool instant = true);
-	void _hideConfigHB(bool instant = true);
-	void _hideBoot(bool instant = true);
-	void _hideNandEmu(bool instant = true);
-	void _hidePartitionsCfg(bool instant = true);
-	void _hidePaths(bool instant = true);
 	void _hideDownload(bool instant = true);
-	void _hideCode(bool instant = false);
-	void _hideCFTheme(bool instant = false);
 	void _hideGame(bool instant = false);
-	void _hideGameInfo(bool instant = false);
-	void _hideConfigGame(bool instant = true);
-	void _hideConfigGCGame(bool instant = true);
-	void _hideCheatSettings(bool instant = false);
-	void _hideCoverBanner(bool instant = true);
-	void _hideWBFS(bool instant = false);
-	void _hideCategorySettings(bool instant = false);
-	void _hideHome(bool instant = false);
-	void _hideExitTo(bool instant = false);
-	void _hideShutdown(bool instant = false);
-	void _hideAbout(bool instant = false);
-	void _hideExplorer(bool instant = false);
-	void _hideWad(bool instant = false);
-	void _hideSource(bool instant = false);
-	void _hidePluginSettings(bool instant = false);
-	void _hideCheckboxesMenu(bool instant = false);
-	void _hideSM_Editor(bool instant = false);
 // menu shows
 	void _showMain(void);
 	void _showCF(bool refreshList = false);
 	void _showTotalGames(const int numberOfGames);
 	void _showError(void);
-	void _showConfigMain(void);
-	void _showConfigGC(void);
-	void _showConfigSrc(bool m_sourceflow = false);
-	void _showConfigHB(void);
-	void _showBoot(void);
-	void _showNandEmu(void);
-	void _showPartitionsCfg(void);
-	void _showPaths(void);
-	void _showDownload(void);
-	void _showCode(void);
-	void _showCFTheme(u32 curParam, int version, bool wide);
 	void _showGame(void);
-	void _showConfigGame(void);
-	void _showConfigGCGame(void);
-	void _showGameInfo(void);
-	void _showCheatSettings(void);
-	void _showCoverBanner(void);
-	void _showWBFS(WBFS_OP op);
-	void _showCategorySettings(void);
-	void _showHome(void);
-	void _showExitTo(void);
-	void _showShutdown(void);	
-	void _showAbout(void);
-	void _showExplorer(void);
-	void _showWad(void);
-	void _showSource(void);
-	void _showPluginSettings(void);
-	void _showCheckboxesMenu(void);
-	void _showSM_Editor(void);
 // menu main functions
 	void _error(const wstringEx &msg);
-	void _configMain(void);
-	void _configGC(void);
-	void _ConfigSrc();
-	void _ConfigHB();
-	void _Boot();
-	int _NandEmuCfg(void);
-	void _partitionsCfg(void);
-	void _Paths();
-	void _download(string gameId = string(), int dl_type = 0);
-	bool _code(char code[4], bool erase = false);
-	void _cfTheme(void);
 	void _game(bool launch = false);
-	bool _gameinfo(void);
-	void _configGame(const dir_discHdr *GameHdr, bool disc = false);
-	void _configGCGame(const dir_discHdr *GameHdr, bool disc = false);
-	void _CheatSettings();
-	void _CoverBanner(void);
-	bool _wbfsOp(WBFS_OP op);
-	void _CategorySettings(bool fromGameSet = false);
-	bool _Home();
-	bool _ExitTo();
-	void _Shutdown();
-	void _about(bool help = false);
-	void _Explorer(void);
-	void _Wad(const char *wad_path = NULL);
-	bool _Source();
-	void _PluginSettings();
-	void _checkboxesMenu(u8 md);
-	void _SM_Editor();
 
 //nand emu functions
 	int _FindEmuPart(bool savesnand, bool searchvalid);
 	bool _checkSave(string id, int nand_type);
 	bool _TestEmuNand(int epart, const char *path, bool indept);
-	void _getEmuNands(void);
-	void _FullNandCheck(void);
-	void _listEmuNands(const char *path, vector<string> &nands);
-	int _ExtractGameSave(string gameId);
-	int _FlashGameSave(string gameId);
-	static void * _NandDumper(void *obj);
-	static void * _NandFlasher(void *obj);
 	float m_progress;
 	float m_fprogress;
 	int m_fileprog;
@@ -865,33 +621,12 @@ private:
 	int m_foldersdone;
 	int m_nandexentry;
 //explorer menu
-	const char *_FolderExplorer(const char *startPath);
-	void _wadExplorer(void);
-	void _refreshExplorer(s8 direction = 0);
 //source menu
-	void _setSrcOptions(void);
-	void _updateSourceBtns(void);
 //select plugins menu
-	void _updatePluginText(void);
-	void _updatePluginCheckboxes(void);
-	void _updateCheckboxesText(void);
-	void _updateCheckboxes(void);
 //categories menu
-	void _updateCatCheckboxes(void);
-	void _getGameCategories(void);
-	void _setGameCategories(void);
-	void _setCatGenDomain(void);
 //adjust coverflow menu
-	void _cfParam(bool inc, int i, const SCFParamDesc &p, int cfVersion, bool wide);
-	const char *_cfDomain(bool selected = false);
 //download menu functions
-	void _setThrdMsg(const wstringEx &msg, float progress);
-	void _setDumpMsg(const wstringEx &msg, float progress, float fileprog);
 	void _downloadProgress(void *obj, int size, int position);
-	int _coverDownloader();
-	int _gametdbDownloaderAsync();
-	int _bannerDownloader();
-	int _downloadCheatFileAsync();
 	//void _downloadUrl(const char *url, u8 **dl_file, u32 *dl_size);
 	//static void * _downloadUrlAsync(void *obj);
 	//static u8 downloadStack[8192];
@@ -910,12 +645,6 @@ private:
 	volatile bool m_thrdDone;
 	vu64 m_thrdWritten;
 // wbfs menu functions
-	static void _addDiscProgress(int status, int total, void *user_data);
-	static void _ShowProgress(int dumpstat, int dumpprog, int filestat, int fileprog, int files, int folders, const char *tmess, void *user_data);
-	static void * _gameInstaller(void *obj);
-	static void * _GCcopyGame(void *obj);
-	bool _searchGamesByID(const char *gameId);
-	int _GCgameInstaller();
 // game selected menu functions
 	void _extractBnr(const dir_discHdr *hdr);
 	void _setCurrentItem(const dir_discHdr *hdr);
@@ -950,20 +679,9 @@ private:
 	void _drawBg(void);
 
 //sourceflow functions
-	void _sourceFlow();
-	int _getSrcFlow();
-	void _setSrcFlow(int version);
-	bool _srcTierBack(bool home);
-	void _srcTierLoad(string fn);
-	void _restoreSrcTiers();
-	void _getSFlowBgTex();
 	
 // misc functions
-	void listThemes(const char * path, vector<string> &themes);
-	void _resetGCSettings(const string &id);
 	void RemoveCover(const char *id);
-	void _setPartition(s8 direction = 0, u8 partition = 0, u8 coverflow = 0);
-	int _sfCacheCoversNeeded();
 	int _cacheCovers(void);
 	int _cacheCover(const dir_discHdr *hdr, bool smallBox);
 	void _mainLoopCommon(bool withCF = false, bool adjusting = false);
@@ -981,7 +699,6 @@ private:
 	const wstringEx _t(const char *key, const wchar_t *def = L"") { return m_loc.getWString(m_curLanguage, key, def); }
 	const wstringEx _fmt(const char *key, const wchar_t *def);
 	wstringEx _getNoticeTranslation(int sorting, wstringEx curLetter);
-	wstringEx _optBoolToString(int b);
 	void _load_installed_cioses();
 	std::map<u8, u8> _installed_cios;
 	typedef std::map<u8, u8>::iterator CIOSItr;// we can use this for both maps.
@@ -989,7 +706,7 @@ private:
 
 //game boot functions
 	void _launch(const dir_discHdr *hdr);
-	void _launchWii(dir_discHdr *hdr, bool dvd, bool disc_cfg = false);
+	void _launchWii(dir_discHdr *hdr, bool dvd);
 	void _launchChannel(dir_discHdr *hdr);
 	void _launchHomebrew(const char *filepath, vector<string> arguments);
 	void _launchGC(dir_discHdr *hdr, bool disc);

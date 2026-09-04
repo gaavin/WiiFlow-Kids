@@ -1265,66 +1265,20 @@ void CMenu::_buildMenus(void)
 	TexHandle.fromImageFile(m_mainBgLQ, fmt("%s/background.png", m_imgsDir.c_str()), GX_TF_CMPR, 64, 64);
 	m_gameBgLQ = m_mainBgLQ;
 
-	// Build menus
+	// Build menus (Kids UI: only the child's screens remain)
 	_initMainMenu();
 	_initErrorMenu();
-	_initConfigMenu();
-	_initConfigGCMenu();
-	_initConfigSrc();
-	_initConfigHB();
-	_initBoot();
-	_initNandEmuMenu();
-	_initPartitionsCfgMenu();
-	_initPathsMenu();
-	_initDownloadMenu();
-	_initCodeMenu();
-	_initCFThemeMenu();
+	_initDownloadMenu();// progress bar used while caching covers
 	_initGameMenu();
-	_initGameInfoMenu();
-	_initConfigGameMenu();
-	_initCheatSettingsMenu(); 
-	_initCoverBanner();
-	_initWBFSMenu();
-	_initCategorySettingsMenu();
-	_initHomeAndExitToMenu();
-	_initAboutMenu();
-	_initExplorer();
-	_initWad();
-	_initSourceMenu();
-	_initPluginSettingsMenu();
-	_initCheckboxesMenu();
 
 	_loadCFCfg();
 }
 
 void CMenu::_updateText(void)
 {
-	_textConfig();
-	_textConfigGC();
-	_textConfigSrc();
-	_textConfigHB();
-	_textBoot();
-	_textNandEmu();
-	_textPartitionsCfg();
-	_textPaths();
-	_textDownload();
-	_textCode();
 	_textGame();
-	_textConfigGame();
-	_textCheatSettings();
-	_textCoverBanner();
-	_textWBFS();
-	_textCategorySettings();
-	_textHome();
-	_textExitTo();
-	_textShutdown();
-	_textExplorer();
-	_textWad();
-	if(m_use_source)
-		_textSource();
-	_textPluginSettings();
-	_textCheckboxesMenu();
 }
+
 
 typedef struct
 {

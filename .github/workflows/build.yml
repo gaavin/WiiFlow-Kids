@@ -1,0 +1,49 @@
+name: Build WiiFlow Kids
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitppc:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Everything else (libpng, freetype, wolfssl, custom fat/ntfs/ext2 ...)
+      # is vendored in portlibs/ and source/libwolfssl/. libmad is not, so pull
+      # it from devkitPro's package repo.
+      - name: Install libmad
+        run: dkp-pacman -Sy --noconfirm --needed ppc-libmad
+
+      - name: Build
+        run: make
+
+      - name: Show build output
+        run: ls -l out/ out/bins/
+
+      - name: Stage apps/wiiflow folder
+        run: |
+          mkdir -p package/apps/wiiflow
+          cp out/boot.dol            package/apps/wiiflow/boot.dol
+          cp wii/apps/wiiflow/meta.xml package/apps/wiiflow/meta.xml
+          cp wii/apps/wiiflow/icon.png package/apps/wiiflow/icon.png
+
+      - name: Upload boot.dol
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-dol
+          path: out/boot.dol
+          if-no-files-found: error
+
+      - name: Upload ready-to-copy apps folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiiflow-kids-apps
+          path: package/
+          if-no-files-found: error
