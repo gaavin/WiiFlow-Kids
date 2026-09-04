@@ -13,6 +13,10 @@
 #include "lockMutex.hpp"
 #include "fonts.h"
 #include "types.h"
+
+/* Kids UI: GameCube "no cover" placeholders, compiled into the dol */
+extern const u8 nopic_gc_png[];
+extern const u8 flatnopic_gc_png[];
 #include "gui/fmt.h"
 #include "gecko/gecko.hpp"
 #include "menu/menu.hpp"
@@ -1301,10 +1305,22 @@ const TexData *CCoverFlow::_coverTexture(int i)
 {
 	if(m_items[i].texture.data == NULL)
 	{
+		/* Kids UI: a GameCube game with no cover shows a GameCube case, not a
+		   Wii one. Falls back to the stock art if the GC texture failed. */
+		const bool gc = m_items[i].hdr != NULL && m_items[i].hdr->type == TYPE_GC_GAME;
 		if(m_box)
-			return (m_items[i].state == STATE_Loading) ? &m_boxLoadingTexture : &m_boxNoCoverTexture;
-		else
-			return (m_items[i].state == STATE_Loading) ? &m_flatLoadingTexture : &m_flatNoCoverTexture;
+		{
+			if(m_items[i].state == STATE_Loading)
+				return &m_boxLoadingTexture;
+			if(gc && m_boxNoCoverGCTexture.data != NULL)
+				return &m_boxNoCoverGCTexture;
+			return &m_boxNoCoverTexture;
+		}
+		if(m_items[i].state == STATE_Loading)
+			return &m_flatLoadingTexture;
+		if(gc && m_flatNoCoverGCTexture.data != NULL)
+			return &m_flatNoCoverGCTexture;
+		return &m_flatNoCoverTexture;
 	}
 	return &m_items[i].texture;
 }
@@ -1462,7 +1478,14 @@ void CCoverFlow::_drawCoverBox(int i, bool mirror, CCoverFlow::DrawMode dm)
 		const TexData *myTex = tex;
 		/* if we have front cover texture only then draw back and spine textures using the default box no cover texture */
 		if(flatTex)
-			myTex = &m_boxNoCoverTexture;
+		{
+			/* Kids UI: use the GameCube case back for GameCube games */
+			const dir_discHdr *bhdr = m_items[m_covers[i].index].hdr;
+			if(bhdr != NULL && bhdr->type == TYPE_GC_GAME && m_boxNoCoverGCTexture.data != NULL)
+				myTex = &m_boxNoCoverGCTexture;
+			else
+				myTex = &m_boxNoCoverTexture;
+		}
 		GX_InitTexObj(&texObj, myTex->data, myTex->width, myTex->height, myTex->format, GX_CLAMP, GX_CLAMP, GX_FALSE);
 		if (myTex->maxLOD > 0)
 			GX_InitTexObjLOD(&texObj, GX_LIN_MIP_LIN, GX_LINEAR, 0.f, (float)myTex->maxLOD, mirror ? 1.f : m_lodBias, GX_FALSE, m_edgeLOD ? GX_TRUE : GX_FALSE, m_aniso);
@@ -1986,6 +2009,10 @@ bool CCoverFlow::start(const string &m_imgsDir)
 			if(TexHandle.fromImageFile(m_flatNoCoverTexture, fmt("%s/flatnopic.png", m_imgsDir.c_str()), GX_TF_CMPR, 32, 512) != TE_OK)
 				return false;
 		}
+		/* Kids UI: GameCube placeholders are embedded, so they cannot be
+		   missing from the SD card and need no theme support. */
+		TexHandle.fromPNG(m_boxNoCoverGCTexture, nopic_gc_png, GX_TF_CMPR, 32, 512);
+		TexHandle.fromPNG(m_flatNoCoverGCTexture, flatnopic_gc_png, GX_TF_CMPR, 32, 512);
 		m_defcovers_loaded = true;
 	}
 

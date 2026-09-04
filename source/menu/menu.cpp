@@ -1277,6 +1277,7 @@ void CMenu::_buildMenus(void)
 void CMenu::_updateText(void)
 {
 	_textGame();
+	_textMain();
 }
 
 

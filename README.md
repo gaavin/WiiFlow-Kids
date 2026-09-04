@@ -11,6 +11,20 @@ Wii and GameCube games appear together in one coverflow. There is no source
 menu, no view switching, no settings, no categories, no favorites, no delete.
 Pressing HOME simply exits WiiFlow.
 
+## On-screen hint
+
+A persistent **(A) Play** hint sits under the coverflow, using the same
+translation key as the PLAY button so the two never disagree. The glyph is
+compiled into `boot.dol`, so no extra file has to reach the SD card.
+
+## GameCube games look like GameCube games
+
+Upstream shows one Wii-branded `?` case for every game missing cover art, so a
+GameCube title looked like a Wii title. `_coverTexture()` now picks an indigo
+GameCube placeholder for `TYPE_GC_GAME`, including the case back and spine
+behind a flat cover. Both placeholders are embedded in the dol, so they need no
+theme support and cannot go missing from the SD card.
+
 ## What was removed
 
 The old WiiFlow UI is gone from the build, not merely hidden. These files were

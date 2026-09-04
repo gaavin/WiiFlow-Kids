@@ -259,6 +259,10 @@ private:
 	TexData m_flatNoCoverTexture;
 	TexData m_boxLoadingTexture;
 	TexData m_boxNoCoverTexture;
+	/* Kids UI: GameCube games get their own placeholder so a missing cover
+	   still reads as a GameCube game rather than a Wii one. */
+	TexData m_boxNoCoverGCTexture;
+	TexData m_flatNoCoverGCTexture;
 	TexData m_dvdSkin;
 	TexData m_dvdSkin_Red;
 	TexData m_dvdSkin_Black;

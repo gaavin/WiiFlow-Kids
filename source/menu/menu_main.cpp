@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 
 #include "menu.hpp"
+
+extern const u8 a_button_png[];
 #include "channel/nand.hpp"
 #include "devicemounter/DeviceHandler.hpp"
 #include "loader/alt_ios.h"
@@ -23,6 +25,8 @@ void CMenu::_hideMain(bool instant)
 {
 	m_btnMgr.hide(m_mainBtnNext, instant);
 	m_btnMgr.hide(m_mainBtnPrev, instant);
+	m_btnMgr.hide(m_mainLblAGlyph, instant);
+	m_btnMgr.hide(m_mainLblPlayHint, instant);
 	m_btnMgr.hide(m_mainLblMessage, instant);
 	m_btnMgr.hide(m_mainLblLetter, instant);
 	m_btnMgr.hide(m_mainLblNotice, instant);
@@ -105,6 +109,12 @@ void CMenu::_showMain()
 	_setMainBg();
 	if(m_refreshGameList)
 		_showCF(m_refreshGameList);
+}
+
+void CMenu::_textMain(void)
+{
+	/* same translation key the PLAY button uses, so they always agree */
+	m_btnMgr.setText(m_mainLblPlayHint, _t("gm1", L"Play"));
 }
 
 void CMenu::_showTotalGames(const int numberOfGames)
@@ -612,6 +622,14 @@ int CMenu::main(void)
 		else
 			m_btnMgr.hide(m_mainBtnNext);
 			
+		/* Kids UI: the (A) Play hint stays up whenever there is something to
+		   play - it teaches the one control the child needs. */
+		if(!m_gameList.empty())
+		{
+			m_btnMgr.show(m_mainLblAGlyph);
+			m_btnMgr.show(m_mainLblPlayHint);
+		}
+
 		/* Kids UI: no buttons on the main screen at all - just covers. */
 		if(!Auto_hide_icons || m_show_zone_main)
 		{
@@ -668,6 +686,13 @@ void CMenu::_initMainMenu()
 
 	_addUserLabels(m_mainLblUser, ARRAY_SIZE(m_mainLblUser), "MAIN");
 
+	/* Kids UI: (A) Play hint, centred under the coverflow. The glyph is
+	   compiled into the dol so no extra file has to reach the SD card. */
+	TexData texAButton;
+	TexHandle.fromPNG(texAButton, a_button_png);
+	m_mainLblAGlyph = _addLabel("MAIN/A_GLYPH", theme.txtFont, L"", 262, 408, 48, 48, theme.txtFontColor, 0, texAButton);
+	m_mainLblPlayHint = _addLabel("MAIN/PLAY_HINT", theme.txtFont, L"", 318, 408, 120, 48, theme.txtFontColor, FTGX_JUSTIFY_LEFT | FTGX_ALIGN_MIDDLE);
+
 	m_mainBtnNext = _addPicButton("MAIN/NEXT_BTN", texNext, texNextS, 540, 146, 80, 80);
 	m_mainBtnPrev = _addPicButton("MAIN/PREV_BTN", texPrev, texPrevS, 20, 146, 80, 80);
 
@@ -711,6 +736,8 @@ void CMenu::_initMainMenu()
 	//
 	_setHideAnim(m_mainBtnNext, "MAIN/NEXT_BTN", 0, 0, 0.f, 0.f);
 	_setHideAnim(m_mainBtnPrev, "MAIN/PREV_BTN", 0, 0, 0.f, 0.f);
+	_setHideAnim(m_mainLblAGlyph, "MAIN/A_GLYPH", 0, 40, 0.f, 0.f);
+	_setHideAnim(m_mainLblPlayHint, "MAIN/PLAY_HINT", 0, 40, 0.f, 0.f);
 	_setHideAnim(m_mainLblMessage, "MAIN/MESSAGE", 0, 0, 0.f, 0.f);
 	_setHideAnim(m_mainLblLetter, "MAIN/LETTER", 0, 0, 0.f, 0.f);
 	_setHideAnim(m_mainLblNotice, "MAIN/NOTICE", 0, 0, 0.f, 0.f);

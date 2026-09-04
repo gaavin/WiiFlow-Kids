@@ -206,6 +206,9 @@ private:
 	s16 m_mainLblMessage;
 	s16 m_mainBtnNext;
 	s16 m_mainBtnPrev;
+	/* Kids UI: persistent on-screen hint - (A) Play */
+	s16 m_mainLblAGlyph;
+	s16 m_mainLblPlayHint;
 	s16 m_mainLblUser[6];
 	s16 m_mem1FreeSize;
 	s16 m_mem2FreeSize;
@@ -593,6 +596,7 @@ private:
 // menu texts
 	void _textError(void);
 	void _textGame(void);
+	void _textMain(void);
 // menu hides
 	void _hideMain(bool instant = false);
 	void _hideError(bool instant = false);
