@@ -402,67 +402,11 @@ void CMenu::_game(bool launch)
 				}
 			}
 		}
-		if(!coverFlipped && !m_video_playing)
-		{
-			/* move to new cover if needed */
-			if((startGameSound == 1 || startGameSound < -8) && (BTN_UP_REPEAT || RIGHT_STICK_UP))
-			{
-				CoverFlow.up();
-				startGameSound = -10;
-			}
-			if((startGameSound == 1 || startGameSound < -8) && (BTN_RIGHT_REPEAT || RIGHT_STICK_RIGHT))
-			{
-				CoverFlow.right();
-				startGameSound = -10;
-			}
-			if((startGameSound == 1 || startGameSound < -8) && (BTN_DOWN_REPEAT || RIGHT_STICK_DOWN))
-			{
-				CoverFlow.down();
-				startGameSound = -10;
-			}
-			if((startGameSound == 1 || startGameSound < -8) && (BTN_LEFT_REPEAT || RIGHT_STICK_LEFT))
-			{
-				CoverFlow.left();
-				startGameSound = -10;
-			}
-			if(startGameSound == -10)// if -10 then we moved to new cover
-			{
-				memcpy(hdr, CoverFlow.getHdr(), sizeof(dir_discHdr));// get new game header
-				_setCurrentItem(hdr);
-				
-				memset(gcfg1Key, 0, sizeof(gcfg1Key));
-				memset(gameTitle, 0, sizeof(gameTitle));
-				
-				if(hdr->type == TYPE_HOMEBREW)
-					wcstombs(gcfg1Key, hdr->title, 63);// uses title which is the folder name in apps.
-				else if(hdr->type == TYPE_PLUGIN)
-				{
-					strncpy(m_plugin.PluginMagicWord, fmt("%08x", hdr->settings[0]), 8);
-					
-					// if game has an id from the plugin database we use the new method which uses platform name/id
-					if(strcmp(hdr->id, "PLUGIN") != 0 && !m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "").empty())
-						strncpy(gcfg1Key, fmt("%s/%s", m_platform.getString("PLUGINS", m_plugin.PluginMagicWord).c_str(), hdr->id), 73);
-					else // old pre 5.4.4 method which uses plugin magic/title of game
-					{
-						if(strrchr(hdr->path, '/') != NULL)
-							wcstombs(gameTitle, hdr->title, 63);
-						else
-							memcpy(gameTitle, hdr->path, 63);// scummvm
-						strncpy(gcfg1Key, fmt("%s/%s", m_plugin.PluginMagicWord, gameTitle), 73);
-					}
-				}
-				else // wii, gc, channels
-					strcpy(gcfg1Key, hdr->id);
+		/* Kids UI: once a game is chosen the selection is frozen. The d-pad and
+		   stick no longer walk the coverflow underneath, so the only way out of
+		   this screen is B (back) or A (play). Removing this also removes the
+		   only writer of startGameSound == -10. */
 
-				if(m_newGame)
-				{
-					m_newGame = false;
-					startGameSound = 1;
-					_playGameSound();
-				}
-			}
-		}
-		
 		if(!m_fa.isLoaded() && !coverFlipped && !m_video_playing)
 		{
 			if(m_banner_loaded && !m_soundThrdBusy && m_zoom_banner)
