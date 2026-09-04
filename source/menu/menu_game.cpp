@@ -312,6 +312,16 @@ void CMenu::_game(bool launch)
 				break;
 			}
 		}
+		/* Kids UI: d-pad steps between PLAY and BACK. CButtonsMgr::up/down
+		   already do this and bail out while the pointer is live, so aiming the
+		   wiimote at the screen still takes priority. */
+		else if(!coverFlipped && (BTN_UP_PRESSED || BTN_DOWN_PRESSED))
+		{
+			if(BTN_UP_PRESSED)
+				m_btnMgr.up();
+			else
+				m_btnMgr.down();
+		}
 		/* play or stop a trailer video */
 		else if(BTN_MINUS_PRESSED && !coverFlipped)
 		{
