@@ -17,6 +17,7 @@
 #include "types.h"
 #include "lockMutex.hpp"
 #include "channel/nand.hpp"
+#include "loader/fs.h"
 #include "loader/sys.h"
 #include "network/https.h"
 

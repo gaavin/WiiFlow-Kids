@@ -59,13 +59,18 @@ stock WiiFlow build once to set things up.
 
 ## Building
 
-Built by GitHub Actions on every push (`.github/workflows/build.yml`) using the
-`devkitpro/devkitppc` image; download `boot.dol` or the ready-to-copy
-`apps/wiiflow` folder from the run's artifacts.
+Built by GitHub Actions on every push (`.github/workflows/main.yml`), using
+pinned devkitPPC r42.2-1 and libogc 2.4.0. The run uploads a
+`wiiflow_kids_<sha>` artifact containing the complete `apps/` and `wiiflow/`
+folders to copy to your SD card.
 
 Locally: devkitPPC + libogc, then `make` from the repository root. Everything
-else (libpng, freetype, wolfSSL, custom fat/ntfs/ext2) is vendored in `portlibs/`
-and `source/libwolfssl/`; only `libmad` comes from devkitPro's package repo.
+else (libpng, freetype, wolfSSL, custom fat/ntfs/ext2) is vendored in
+`portlibs/` and `source/libwolfssl/`.
+
+Verified building clean against devkitPPC r42.2 / GCC 12.2.0 with zero
+compiler warnings. Stripping the old UI took `boot.dol` from 4,580,256 to
+3,921,824 bytes.
 
 ---
 

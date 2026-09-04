@@ -1,6 +1,6 @@
-name: Build binaries
+name: Build WiiFlow Kids
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
@@ -56,7 +56,7 @@ jobs:
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with: 
-          name: wiiflow_lite_${{ env.sha }}
+          name: wiiflow_kids_${{ env.sha }}
           path: |
             apps
             wiiflow
