@@ -28,6 +28,24 @@
 #include "network/proxysettings.h"
 
 // Sounds
+/* Kids UI ships its own theme, coverflow layout, typeface and chrome inside
+   the dol, so a bare boot.dol looks right with nothing else on the card.
+   Files of the same name on SD still win — these are only reached when the
+   file is missing or failed to load. */
+extern const u8 kids_theme_ini[];
+extern const u32 kids_theme_ini_size;
+extern const u8 kids_coverflow_ini[];
+extern const u32 kids_coverflow_ini_size;
+extern const u8 background_png[];
+extern const u8 butleft_png[];
+extern const u8 butcenter_png[];
+extern const u8 butright_png[];
+extern const u8 butsleft_png[];
+extern const u8 butscenter_png[];
+extern const u8 butsright_png[];
+extern const u8 font_ttf[];
+extern const u32 font_ttf_size;
+
 extern const u8 click_wav[];
 extern const u32 click_wav_size;
 extern const u8 hover_wav[];
@@ -352,9 +370,14 @@ bool CMenu::init(bool usb_mounted)
 	/* Check if wiiflow is parental locked */
 	m_locked = m_cfg.getString("GENERAL", "parent_code", "").size() >= 4;
 	
-	/* Switch WFLA to DWFA in case they were using old wiiflow lite */
-	if(m_cfg.getString("GENERAL", "returnto") == "WFLA")
-		m_cfg.setString("GENERAL", "returnto", "DWFA");
+	/* Games return to the WiiFlow Kids channel rather than the System Menu.
+	   UP2E is this build's forwarder title ID — the community's widely
+	   quoted DWFA belongs to a different channel and will not match. */
+	if(!m_cfg.has("GENERAL", "returnto"))
+		m_cfg.setString("GENERAL", "returnto", CHANNEL_TITLE_ID);
+	string rtrn = m_cfg.getString("GENERAL", "returnto");
+	if(rtrn == "WFLA" || rtrn == "DWFA")
+		m_cfg.setString("GENERAL", "returnto", CHANNEL_TITLE_ID);
 
 	/* set WIIFLOW_DEF exit to option */
 	/* 0 thru 2 of exit to enum (EXIT_TO_MENU, EXIT_TO_HBC, EXIT_TO_WIIU) in sys.h */
@@ -421,9 +444,13 @@ bool CMenu::init(bool usb_mounted)
 	m_themeName = m_cfg.getString("GENERAL", "theme", "default");
 	m_themeDataDir = fmt("%s/%s", m_themeDir.c_str(), m_themeName.c_str());
 	m_theme.load(fmt("%s.ini", m_themeDataDir.c_str()));
+	if(!m_theme.loaded())
+		m_theme.loadFromBuffer((const char *)kids_theme_ini, kids_theme_ini_size);
 	m_coverflow.load(fmt("%s/%s.ini", m_coverflowsDir.c_str(), m_themeName.c_str()));
 	if(!m_coverflow.loaded())
 		m_coverflow.load(fmt("%s/default.ini", m_coverflowsDir.c_str()));
+	if(!m_coverflow.loaded())
+		m_coverflow.loadFromBuffer((const char *)kids_coverflow_ini, kids_coverflow_ini_size);
 		
 	/* Init the onscreen pointer */
 	m_aa = 3;
@@ -554,6 +581,15 @@ void CMenu::_setAA(int aa)
 		default:
 			m_aa = 0;
 	}
+}
+
+/* Load a themed texture: the file next to the dol wins, and the copy
+   compiled in is used when it is missing, so the shipped look survives a
+   card that only has boot.dol on it. */
+void CMenu::_bundledTex(TexData &tex, const char *file, const u8 *bundled)
+{
+	if(TexHandle.fromImageFile(tex, fmt("%s/%s", m_imgsDir.c_str(), file)) != TE_OK && bundled != NULL)
+		TexHandle.fromPNG(tex, bundled);
 }
 
 void CMenu::_loadCFCfg()
@@ -880,17 +916,17 @@ void CMenu::_buildMenus(void)
 	theme.cameraSound	= _sound(theme.soundSet, m_theme.getString("GENERAL", "camera_sound", "").c_str(), camera_wav, camera_wav_size, "default_camera", false);
 
 	// Default textures
-	TexHandle.fromImageFile(theme.btnTexL, fmt("%s/butleft.png", m_imgsDir.c_str()));
+	_bundledTex(theme.btnTexL, "butleft.png", butleft_png);
 	theme.btnTexL = _texture("GENERAL", "button_texture_left", theme.btnTexL); 
-	TexHandle.fromImageFile(theme.btnTexR, fmt("%s/butright.png", m_imgsDir.c_str()));
+	_bundledTex(theme.btnTexR, "butright.png", butright_png);
 	theme.btnTexR = _texture("GENERAL", "button_texture_right", theme.btnTexR); 
-	TexHandle.fromImageFile(theme.btnTexC, fmt("%s/butcenter.png", m_imgsDir.c_str()));
+	_bundledTex(theme.btnTexC, "butcenter.png", butcenter_png);
 	theme.btnTexC = _texture("GENERAL", "button_texture_center", theme.btnTexC); 
-	TexHandle.fromImageFile(theme.btnTexLS, fmt("%s/butsleft.png", m_imgsDir.c_str()));
+	_bundledTex(theme.btnTexLS, "butsleft.png", butsleft_png);
 	theme.btnTexLS = _texture("GENERAL", "button_texture_left_selected", theme.btnTexLS); 
-	TexHandle.fromImageFile(theme.btnTexRS, fmt("%s/butsright.png", m_imgsDir.c_str()));
+	_bundledTex(theme.btnTexRS, "butsright.png", butsright_png);
 	theme.btnTexRS = _texture("GENERAL", "button_texture_right_selected", theme.btnTexRS); 
-	TexHandle.fromImageFile(theme.btnTexCS, fmt("%s/butscenter.png", m_imgsDir.c_str()));
+	_bundledTex(theme.btnTexCS, "butscenter.png", butscenter_png);
 	theme.btnTexCS = _texture("GENERAL", "button_texture_center_selected", theme.btnTexCS); 
 
 	/* Kids UI: language flags and checkboxes belonged to stripped settings
@@ -917,8 +953,9 @@ void CMenu::_buildMenus(void)
 	theme.btnTexMinusS = _texture("GENERAL", "minus_button_texture_selected", theme.btnTexMinusS);
 
 	// Default background
-	TexHandle.fromImageFile(theme.bg, fmt("%s/background.png", m_imgsDir.c_str()));
-	TexHandle.fromImageFile(m_mainBgLQ, fmt("%s/background.png", m_imgsDir.c_str()), GX_TF_CMPR, 64, 64);
+	_bundledTex(theme.bg, "background.png", background_png);
+	if(TexHandle.fromImageFile(m_mainBgLQ, fmt("%s/background.png", m_imgsDir.c_str()), GX_TF_CMPR, 64, 64) != TE_OK)
+		TexHandle.fromPNG(m_mainBgLQ, background_png, GX_TF_CMPR, 64, 64);
 	m_gameBgLQ = m_mainBgLQ;
 
 	// Build menus (Kids UI: only the child's screens remain)
@@ -991,6 +1028,13 @@ SFont CMenu::_dfltFont(u32 fontSize, u32 lineSpacing, u32 weight, u32 index, con
 		return retFont;
 	}
 	
+	/* the typeface the theme was designed against, compiled into the dol */
+	if(retFont.fromBuffer(font_ttf, font_ttf_size, fonts[0].res, fonts[1].res, fonts[2].res, index, filename.c_str()))
+	{
+		theme.fontSet.push_back(retFont);
+		return retFont;
+	}
+
 	/* Fallback to default font */
 	/* default font is the wii's system font */
 	if(retFont.fromBuffer(m_base_font, m_base_font_size, fonts[0].res, fonts[1].res, fonts[2].res, index, filename.c_str()))

@@ -144,28 +144,18 @@ const std::string &Config::prevDomain(const std::string &start) const
 	return i->first;
 }
 
-bool Config::load(const char *filename)
+/* shared by load() and loadFromBuffer(): same grammar either way */
+void Config::_parse(std::istream &in)
 {
-	if(m_loaded)
-		return true;
-	//if (m_loaded && m_changed) save();
-	
-	std::ifstream file(filename, std::ios::in | std::ios::binary);
 	std::string line;
 	std::string domain("");
 
-	m_changed = false;
-	m_loaded = false;
-	m_filename = filename;
-	u32 n = 0;
-	if (!file.is_open()) return m_loaded;
 	m_domains.clear();
-	while (file.good())
+	while (in.good())
 	{
 		line.clear();
-		std::getline(file, line, '\n');
-		++n;
-		if (!file.bad() && !file.fail())
+		std::getline(in, line, '\n');
+		if (!in.bad() && !in.fail())
 		{
 			line = trimEnd(line);
 			if (line.empty() || line[0] == '#' || line[0] == '\0') continue;
@@ -188,6 +178,40 @@ bool Config::load(const char *filename)
 				}
 		}
 	}
+}
+
+/* Load the copy compiled into the dol. WiiFlow Kids ships its theme and
+   coverflow layout this way so a bare boot.dol renders correctly with
+   nothing on the card; a file of the same name on SD still wins, because
+   the caller only reaches here when load() found none. */
+bool Config::loadFromBuffer(const char *buffer, u32 size, const char *saveAs)
+{
+	if (m_loaded || buffer == NULL || size == 0)
+		return m_loaded;
+
+	std::string text(buffer, size);
+	std::istringstream in(text);
+
+	m_changed = false;
+	m_loaded = false;
+	m_filename = saveAs != NULL ? saveAs : "";
+	_parse(in);
+	m_loaded = true;
+	return m_loaded;
+}
+
+bool Config::load(const char *filename)
+{
+	if(m_loaded)
+		return true;
+
+	std::ifstream file(filename, std::ios::in | std::ios::binary);
+
+	m_changed = false;
+	m_loaded = false;
+	m_filename = filename;
+	if (!file.is_open()) return m_loaded;
+	_parse(file);
 	file.close(); /* not sure if needed */
 	m_loaded = true;
 	return m_loaded;

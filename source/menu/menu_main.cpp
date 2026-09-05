@@ -6,6 +6,10 @@
 
 #include "menu.hpp"
 
+extern const u8 btnprev_png[];
+extern const u8 btnprevs_png[];
+extern const u8 btnnext_png[];
+extern const u8 btnnexts_png[];
 extern const u8 a_button_png[];
 #include "channel/nand.hpp"
 #include "devicemounter/DeviceHandler.hpp"
@@ -517,10 +521,10 @@ void CMenu::_initMainMenu()
 	if(m_theme.loaded() && TexHandle.fromImageFile(bgLQ, fmt("%s/%s", m_themeDataDir.c_str(), m_theme.getString("MAIN/BG", "texture").c_str()), GX_TF_CMPR, 64, 64) == TE_OK)
 		m_mainBgLQ = bgLQ;
 
-	TexHandle.fromImageFile(texPrev, fmt("%s/btnprev.png", m_imgsDir.c_str()));
-	TexHandle.fromImageFile(texPrevS, fmt("%s/btnprevs.png", m_imgsDir.c_str()));
-	TexHandle.fromImageFile(texNext, fmt("%s/btnnext.png", m_imgsDir.c_str()));
-	TexHandle.fromImageFile(texNextS, fmt("%s/btnnexts.png", m_imgsDir.c_str()));
+	_bundledTex(texPrev, "btnprev.png", btnprev_png);
+	_bundledTex(texPrevS, "btnprevs.png", btnprevs_png);
+	_bundledTex(texNext, "btnnext.png", btnnext_png);
+	_bundledTex(texNextS, "btnnexts.png", btnnexts_png);
 	//TexHandle.fromImageFile(texUser1, fmt("%s/mainUser1.png", m_imgsDir.c_str()));
 
 	_addUserLabels(m_mainLblUser, ARRAY_SIZE(m_mainLblUser), "MAIN");

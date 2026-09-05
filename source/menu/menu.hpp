@@ -125,6 +125,7 @@ private:
 // Dir strings
 	string m_appDir;
 	string m_imgsDir;
+	void _bundledTex(TexData &tex, const char *file, const u8 *bundled);
 	string m_binsDir;
 	string m_dataDir;
 	

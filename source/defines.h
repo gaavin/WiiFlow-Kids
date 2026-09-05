@@ -4,6 +4,8 @@
 
 #define APP_DATA_DIR			"wiiflow"
 #define APPS_DIR				"apps/wiiflow"
+/* WiiFlow Kids channel forwarder, 00010001-55503245 */
+#define CHANNEL_TITLE_ID		"UP2E"
 
 #define GAMES_DIR				"%s:/wbfs"
 #define HOMEBREW_DIR			"apps"

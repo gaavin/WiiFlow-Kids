@@ -2,6 +2,7 @@
 #ifndef __CONFIG_HPP
 #define __CONFIG_HPP
 
+#include <iosfwd>
 #include <map>
 #include <string>
 #include <vector>
@@ -15,6 +16,9 @@ public:
 	Config(void);
 	void clear(void) { m_domains.clear(); m_groupCustomTitles.clear();}
 	bool load(const char *filename = 0);
+	/* fall back to a copy compiled into the dol; saveAs is the path a
+	   later save() should write to, or NULL to keep it in memory only */
+	bool loadFromBuffer(const char *buffer, u32 size, const char *saveAs = 0);
 	void groupCustomTitles(void);
 	void unload(void);
 	void save(bool unload = false);
@@ -55,6 +59,7 @@ public:
 	bool hasDomain(const std::string &domain) const;
 	void copyDomain(const std::string &dst, const std::string &src);
 private:
+	void _parse(std::istream &in);
 	typedef std::map<std::string, std::string> KeyMap;
 	typedef std::map<std::string, KeyMap> DomainMap;
 private:
