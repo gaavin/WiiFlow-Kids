@@ -50,14 +50,21 @@ def encode_rgb565(w, h, px):
 
 
 def encode_ia8(w, h, px):
-    """I then A, 4x4 tiles. White glyph in alpha, as the original taglines."""
+    """A then I, 4x4 tiles.
+
+    Alpha is the high byte, matching encode_ia4 putting alpha in the high
+    nibble. Writing intensity first is what produced the black bars on the
+    channel banner: a transparent background encodes as (255, 0), which the
+    hardware read as alpha 255 / intensity 0 — an opaque black rectangle
+    with the artwork punched through it in white.
+    """
     out = _header(w, h, 3)
     for ty in range(0, (h + 3) // 4 * 4, 4):
         for tx in range(0, (w + 3) // 4 * 4, 4):
             for k in range(16):
                 r, g, b, a = _px(px, w, h, tx + k % 4, ty + k // 4)
                 intensity = (r + g + b) // 3
-                out += bytes([intensity, a])
+                out += bytes([a, intensity])
     return bytes(out)
 
 
