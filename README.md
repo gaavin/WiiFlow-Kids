@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/hero.jpg" alt="WiiFlow Kids: a coverflow of Wii and GameCube games over a reef and sky background" width="100%">
+  <img src="docs/hero.jpg" alt="WiiFlow Kids: Wii and GameCube games together in one coverflow, over a reef and sky background" width="100%">
 </p>
 
 # WiiFlow Kids
@@ -74,3 +74,10 @@ WiiFlow by the original authors. Channel forwarder from
 [wyndchyme/wiiflow-forwarder](https://github.com/wyndchyme/wiiflow-forwarder)
 (Apache-2.0), retextured here. Cover art from GameTDB. Bundled typeface is Open
 Sans (Apache-2.0).
+
+## In motion
+
+<video src="https://github.com/gaavin/WiiFlow-Kids/raw/kids-ui/docs/demo.mp4" controls width="100%"></video>
+
+If the player does not load, [download the clip](docs/demo.mp4) — it is in the
+repository at `docs/demo.mp4`.
