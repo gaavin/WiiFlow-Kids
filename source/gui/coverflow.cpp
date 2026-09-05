@@ -356,16 +356,14 @@ void CCoverFlow::setRange(u32 rows, u32 columns)
 		return;
 	if (m_covers != NULL)
 	{
-		stopCoverLoader();
-		MEM2_free(m_covers);
-		m_covers = NULL;
+		/* Alloc first. _transposeCover copies slots out of m_covers, so the
+		   live list has to stay until that finishes. Freeing it first was a
+		   use-after-free on every layout change, and an OOM left m_covers
+		   NULL while the comment claimed we kept the old geometry. */
 		CCover *tmpCovers = (CCover*)MEM2_alloc(sizeof(CCover) * range);
 		if(tmpCovers == NULL)
-		{
-			/* out of MEM2: keep the old geometry rather than run on a null
-			   layout. m_covers stays NULL, which every caller now tests. */
 			return;
-		}
+		stopCoverLoader();
 		for(size_t i = 0; i < range; ++i)
 		{
 			// does not allocate memory -- calls: operator new (sizeof(CCover), tmpCovers+i)
@@ -381,6 +379,7 @@ void CCoverFlow::setRange(u32 rows, u32 columns)
 		else
 			for (u32 x = 0; x < range; ++x)
 				_transposeCover(tmpCovers, rows, columns, x);
+		MEM2_free(m_covers);
 		m_rows = rows;
 		m_columns = columns;
 		m_range = range;
@@ -2855,19 +2854,22 @@ CCoverFlow::CLRet CCoverFlow::_loadCoverTex(u32 i, bool box, bool hq, bool blank
 	/* try to find the wfc texture file in the cache folder */
 	if(!m_cachePath.empty())
 	{
-		char wfcTitle[128];
-		wfcTitle[127] = '\0';
 		char *full_path = (char*)MEM2_alloc(MAX_FAT_PATH+1);
 		if(full_path == NULL)
 			return CL_NOMEM;
 		memset(full_path, 0, MAX_FAT_PATH+1);
-		
-		/* get title for wfc file */
+
+		/* Same pointer _cacheCover snprintfs into the .wfc name. Copying it
+		   into a 128-byte stack buffer truncated hdr->path (256) and the
+		   blank-cover filename, so the loader could miss a cache file the
+		   writer created under the full name. snprintf below already bounds
+		   the output path. */
+		const char *wfcTitle;
 		if(blankBoxCover)
 		{
 			const char *blankCoverPath = mainMenu.getBlankCoverPath(m_items[i].hdr);
 			if(blankCoverPath != NULL && strrchr(blankCoverPath, '/') != NULL)
-				strncpy(wfcTitle, strrchr(blankCoverPath, '/') + 1, sizeof(wfcTitle) - 1);
+				wfcTitle = strrchr(blankCoverPath, '/') + 1;
 			else
 			{
 				free(full_path);
@@ -2875,7 +2877,7 @@ CCoverFlow::CLRet CCoverFlow::_loadCoverTex(u32 i, bool box, bool hq, bool blank
 			}
 		}
 		else
-			strncpy(wfcTitle, getFilenameId(m_items[i].hdr), sizeof(wfcTitle) - 1);
+			wfcTitle = getFilenameId(m_items[i].hdr);
 
 		/* snprintf, not fmt(): fmt() hands back a pointer into eight static
 		   buffers shared process-wide behind a racy index, and this runs on
