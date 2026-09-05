@@ -949,7 +949,9 @@ void CMenu::_buildMenus(void)
 	m_btnMgr.setRumble(m_cfg.getBool("GENERAL", "rumble", true));
 	// Default fonts
 	theme.btnFont = _dfltFont(BUTTONFONT);
-	theme.btnFontColor = m_theme.getColor("GENERAL", "button_font_color", 0xD0BFDFFF);
+	/* Kids UI: deep navy ink, not the old lavender-on-pastel which vanished
+	   into both the blue capsule and the yellow selected state. */
+	theme.btnFontColor = m_theme.getColor("GENERAL", "button_font_color", 0x122038FF);
 
 	theme.lblFont = _dfltFont(LABELFONT);
 	theme.lblFontColor = m_theme.getColor("GENERAL", "label_font_color", 0xD0BFDFFF);
@@ -2386,10 +2388,12 @@ bool CMenu::_loadList(void)
 bool CMenu::_loadWiiList(void)
 {
 	gprintf("Adding wii list\n");
-	
-	bool updateCache = m_cfg.getBool(WII_DOMAIN, "update_cache");
-	if(updateCache)
-		cacheCovers = true;
+
+	/* Kids UI: always rescan. Parents add games by taking the SD card to a
+	   PC, and there is no settings button left to refresh the list cache.
+	   Do not set cacheCovers here - that would reconvert every cover on
+	   every boot. New artwork is picked up by the self-heal in _showCF(). */
+	bool updateCache = true;
 	m_cfg.remove(WII_DOMAIN, "update_cache");
 	for(u8 i = 0; i < 2; ++i)
 	{
@@ -2440,9 +2444,9 @@ bool CMenu::_loadGamecubeList()
 {
 	gprintf("Adding gamecube list\n");
 
-	bool updateCache = m_cfg.getBool(GC_DOMAIN, "update_cache");
-	if(updateCache)
-		cacheCovers = true;
+	/* Kids UI: always rescan. Same reason as _loadWiiList - the SD card is
+	   the only way to add games, so a stale gamecube.db hides new titles. */
+	bool updateCache = true;
 	m_cfg.remove(GC_DOMAIN, "update_cache");
 	for(u8 i = 0; i < 2; ++i)
 	{

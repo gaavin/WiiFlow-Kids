@@ -541,11 +541,13 @@ void CMenu::_initGameMenu()
 	if(m_theme.loaded() && TexHandle.fromImageFile(bgLQ, fmt("%s/%s", m_themeDataDir.c_str(), m_theme.getString("GAME/BG", "texture").c_str()), GX_TF_CMPR, 64, 64) == TE_OK)
 		m_gameBgLQ = bgLQ;
 
-	/* Kids UI: PLAY and BACK are the only two buttons, made large for small hands. */
-	m_gameBtnPlay = _addButton("GAME/PLAY_BTN", theme.btnFont, L"", 390, 326, 230, 64, theme.btnFontColor);
-	m_gameBtnBack = _addButton("GAME/BACK_BTN", theme.btnFont, L"", 390, 400, 230, 64, theme.btnFontColor);
-	m_gameBtnBackFull = _addButton("GAME/BACK_FULL_BTN", theme.btnFont, L"", 100, 390, 200, 56, theme.btnFontColor);
-	m_gameBtnPlayFull = _addButton("GAME/PLAY_FULL_BTN", theme.btnFont, L"", 340, 390, 200, 56, theme.btnFontColor);
+	/* Kids UI: PLAY stacked tight over BACK on the right, large enough
+	   for small hands but with only an 8px gap so the pair reads as one
+	   control cluster rather than two distant buttons. */
+	m_gameBtnPlay = _addButton("GAME/PLAY_BTN", theme.btnFont, L"", 404, 336, 212, 56, theme.btnFontColor);
+	m_gameBtnBack = _addButton("GAME/BACK_BTN", theme.btnFont, L"", 404, 400, 212, 56, theme.btnFontColor);
+	m_gameBtnBackFull = _addButton("GAME/BACK_FULL_BTN", theme.btnFont, L"", 118, 404, 190, 52, theme.btnFontColor);
+	m_gameBtnPlayFull = _addButton("GAME/PLAY_FULL_BTN", theme.btnFont, L"", 328, 404, 190, 52, theme.btnFontColor);
 	m_gameLblSnapBg = _addLabel("GAME/SNAP_BG", theme.txtFont, L"", 385, 31, 246, 170, theme.txtFontColor, 0, texSnapShotBg);
 	m_gameLblSnap = _addLabel("GAME/SNAP", theme.txtFont, L"", 385, 31, 100, 100, theme.txtFontColor, 0, m_game_snap);
 	m_gameLblOverlay = _addLabel("GAME/OVERLAY", theme.txtFont, L"", 385, 31, 100, 100, theme.txtFontColor, 0, m_game_overlay);

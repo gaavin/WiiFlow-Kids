@@ -4,14 +4,9 @@
 		<coder>Fledge68 (WiiFlow Lite) - Kids UI fork</coder>
 		<version>5.5.4-kids</version>
 		<release_date>20260904000000</release_date>
-		<!--   // remove this line to enable arguments
 		<arguments>
-			<arg>ios=249</arg>
 			<arg>waitdir=sd:/apps/wiiflow/wait_imgs</arg>
-			<arg>waitloop</arg>
-			<arg>noflash</arg>
 		</arguments>
-		// remove this line to enable arguments -->
 		<short_description>Simple game loader for kids</short_description>
 		<long_description>WiiFlow Kids is a fork of WiiFlow Lite stripped down to a single
     screen a young child can use on their own.
