@@ -47,32 +47,60 @@ and re-sign it, leaving every other structure as shipped.
 
 ## Rebuilding the Kids WAD
 
-`tools/` rebuilds the channel from the upstream release WAD. Only two RGBA8
-textures and the IMET channel name change; `banner.brlyt`, `banner_Start.brlan`,
-`banner_Loop.brlan`, `icon.brlyt`, `icon.brlan` and `sound.bin` are carried over
-byte-for-byte, so nothing the System Menu parses structurally was authored here.
+`tools/` rebuilds the channel from the WAD already in this directory. Run:
 
-    u8.py         U8 archive reader
-    lz.py         Nintendo LZ10 codec (round-trip asserted before use)
-    tpl.py        TPL RGBA8 tiled codec
-    build_wad.py  retexture -> recompress -> IMD5 -> U8 -> IMET
-    pack.py       encrypt, fake-sign the TMD, pack, then verify its own output
+    python3 tools/make_art.py        # all eight banner/icon textures
+    python3 tools/make_music.py      # sound.bin, an original BNS
+    python3 tools/rebuild_channel.py # retexture, repack, re-sign, verify
 
-Fetch `WiiFlow.Channel.Forwarder.wad` from the upstream releases page as
-`base.wad`, then run `build_wad.py` followed by `pack.py`.
+    u8.py, lz.py, tpl.py   U8 / LZ10 / TPL codecs
+    dspadpcm.py            DSP-ADPCM, verified by decoding its own output
+    make_art.py            draws every texture
+    make_music.py          composes the jingle and wraps it as BNS
+    rebuild_channel.py     rebuilds the archives, packs and checks the WAD
+    build_wad.py, pack.py  the original base.wad path, kept for reference
+
+`banner.brlyt`, `banner_Start.brlan`, `banner_Loop.brlan`, `icon.brlyt` and
+`icon.brlan` are carried through byte-for-byte and the rebuild asserts it, so
+the System Menu only ever parses structures it has already booted. Nothing
+here authors a layout.
+
+### Why the channel looked like a cropped image
+
+`banner_BG.tpl` shipped as **4x347** and `menubnr_BG.tpl` as **2x96** — single
+columns of gradient stretched across panes that are 608x456 and 170x96. Only
+the 496x169 logo carried any real picture, so it read as a rectangle pasted on
+a flat wash. `rebuild_channel.py` rebuilds the inner U8 rather than patching
+pixels in place, which is what allows a texture to change size; the
+backgrounds are now 304x228 and 170x96, dithered before the RGB565 encode
+because a 5-6-5 sky bands visibly on a TV.
+
+### Where the animation was
+
+It was never missing. `banner_Loop.brlan` scrolls `N_sil_tra_00` and
+`N_sil_tra_01` across 2000 frames, and each carries three 614x48 strips laid
+end to end at -614/0/+614 so a seamless band scrolls forever. Blanking those
+strips to remove the black tickers left the motion running over nothing.
+Drawing into them brings it back with no layout change at all.
+
+The strips are IA8/IA4 — intensity and alpha only — and the layout tints them
+per material: `P_sil_*_00` pale cyan (192,240,255), `P_sil_c_01/04/05` grey
+(194,194,194). So the lower band carries bubbles, fish and dolphins underwater
+and the upper band carries clouds, each matched to the tint it is given. Every
+element is stamped at x-w, x and x+w so it tiles at the strip width.
 
 ### Format notes worth keeping
 
 Verified against the real file rather than taken from documentation:
 
 - The **IMET MD5 covers `[0x00,0x600)`** with the 16-byte field at `0x5F0`
-  zeroed - not the `[0x40,0x640)` range usually quoted. Using the documented
-  range produces a wrong hash.
+  zeroed - not the `[0x40,0x640)` range usually quoted.
 - The TPL codec was validated by re-encoding upstream's own source PNGs and
-  getting **byte-identical** TPLs back, so the encoder matches whatever tool
-  built the originals.
-- The banner already ships **animation and sound**: `banner_Start.brlan`,
-  `banner_Loop.brlan` and a 222,680-byte BNS `sound.bin`.
+  getting **byte-identical** TPLs back.
+- The BNS is codec 0 (DSP-ADPCM), stereo, 32kHz, channels stored
+  **sequentially** rather than interleaved - chan1 begins at the offset in the
+  channel table, not at every other frame. ADPCM info is 48 bytes per channel:
+  16 Q11 coefficients then context.
 
 ### Corrections to the community documentation
 
@@ -80,5 +108,5 @@ Verified against the real file rather than taken from documentation:
   homebrew-channel range so it is safe to install, but WiiFlow's
   `[GENERAL] returnto=DWFA` will not match this channel.
 - It requires **IOS35**, not IOS58.
-- Upstream's Chinese IMET name slot reads "Wii Sports + Resort", a leftover from
-  the CustomizeMii base. All ten slots now read "WiiFlow Kids".
+- Upstream's Chinese IMET name slot reads "Wii Sports + Resort", a leftover
+  from the CustomizeMii base. All ten slots now read "WiiFlow Kids".

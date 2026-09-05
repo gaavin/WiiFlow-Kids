@@ -108,30 +108,50 @@ def stretch_banner_bg(brlyt: bytes) -> bytes:
     raise SystemExit("P_BG pane not found in banner.brlyt")
 
 
-def patch_u8(raw: bytes, label: str) -> bytes:
+def rebuild_inner_u8(raw: bytes, label: str) -> bytes:
+    """Replace textures inside banner.bin/icon.bin, allowing new dimensions.
+
+    The old path patched TPL pixels in place and rejected any size change,
+    which is why the backgrounds were stuck at 4x347 and 2x96 — single
+    columns stretched across the whole pane. Resizing them means the data
+    section moves, so the archive is rebuilt: header, node table and string
+    table are reused untouched (no names change), and every file node gets
+    its offset and length rewritten as the payloads are laid back down.
+    """
     ents, meta = u8.parse(raw, 0)
-    out = bytearray(raw)
+    data_off = meta["data_off"]
+    node_tbl = meta["nt"]
+    payloads = {}
     for e in ents:
         if e["type"] != 0:
             continue
+        blob = raw[e["data_off"]:e["data_off"] + e["size"]]
         if e["name"] == "banner.brlyt":
-            patched = stretch_banner_bg(bytes(out[e["data_off"]:e["data_off"] + e["size"]]))
-            if len(patched) != e["size"]:
+            blob = stretch_banner_bg(blob)
+            if len(blob) != e["size"]:
                 raise SystemExit("banner.brlyt size changed")
-            out[e["data_off"]:e["data_off"] + e["size"]] = patched
+        elif e["name"] in REPLACEMENTS:
+            png = Image.open(REPLACEMENTS[e["name"]]).convert("RGBA")
+            ow, oh, fmt = tpl_fmt(blob)
+            nw, nh = png.size
+            blob = ENCODERS[fmt](nw, nh, png.tobytes())
+            note = "" if (nw, nh) == (ow, oh) else f"  (was {ow}x{oh})"
+            print(f"  {label}/{e['name']}: {nw}x{nh} fmt={fmt} {len(blob)} bytes{note}")
+        payloads[e["idx"]] = blob
+
+    out = bytearray(raw[:data_off])
+    cur = data_off
+    body = bytearray()
+    for e in ents:
+        if e["type"] != 0:
             continue
-        if e["name"] not in REPLACEMENTS:
-            continue
-        png = Image.open(REPLACEMENTS[e["name"]]).convert("RGBA")
-        w, h, fmt = tpl_fmt(raw[e["data_off"]:e["data_off"] + e["size"]])
-        if png.size != (w, h):
-            raise SystemExit(f"{e['name']}: png {png.size} != tpl {w}x{h}")
-        enc = ENCODERS[fmt](w, h, png.tobytes())
-        if len(enc) != e["size"]:
-            raise SystemExit(f"{e['name']}: encoded {len(enc)} != {e['size']}")
-        out[e["data_off"]:e["data_off"] + e["size"]] = enc
-        print(f"  patched {label}/{e['name']} {w}x{h} fmt={fmt}")
-    return bytes(out)
+        blob = payloads[e["idx"]]
+        cur = al(cur, 32)
+        body += b"\0" * (cur - (data_off + len(body))) + blob
+        n = node_tbl + e["idx"] * 12
+        out[n + 4:n + 12] = struct.pack(">II", cur, len(blob))
+        cur += len(blob)
+    return bytes(out) + bytes(body)
 
 
 def imd5(payload: bytes) -> bytes:
@@ -247,11 +267,15 @@ def main():
         if e["name"] in ("banner.bin", "icon.bin"):
             assert blob[:4] == b"IMD5"
             raw = lz.decompress(blob[0x20:])
-            raw = patch_u8(raw, e["name"])
+            raw = rebuild_inner_u8(raw, e["name"])
             comp = lz.compress(raw)
             assert lz.decompress(comp) == raw
             parts[e["name"]] = imd5(comp)
             print(f"  {e['name']}: u8={len(raw)} lz={len(comp)}")
+        elif e["name"] == "sound.bin" and (ROOT / "sound.bin").exists():
+            # our own BNS, already IMD5-wrapped by make_music.py
+            parts[e["name"]] = (ROOT / "sound.bin").read_bytes()
+            print(f"  sound.bin: {len(blob)} -> {len(parts[e['name']])} (replaced)")
         else:
             parts[e["name"]] = blob
     print("rebuild outer U8")
