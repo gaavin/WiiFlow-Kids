@@ -1,129 +1,76 @@
+<p align="center">
+  <img src="docs/hero.jpg" alt="WiiFlow Kids: a coverflow of Wii and GameCube games over a reef and sky background" width="100%">
+</p>
+
 # WiiFlow Kids
 
-A fork of [WiiFlow Lite](https://github.com/Fledge68/WiiFlow_Lite) stripped down
-to a single screen a young child can use on their own.
+A fork of [WiiFlow Lite](https://github.com/Fledge68/WiiFlow_Lite) stripped down to
+one screen a young child can use on their own.
 
-## The whole interface
+Point at a game, press **A**, press **PLAY**. That is the whole interface.
 
-Point at a game, press **A**, press **PLAY**. That is all of it.
+Wii and GameCube games sit together in one coverflow. There is no source menu, no
+settings, no categories, no favorites and no delete — those screens are removed
+from the build, not hidden. HOME exits.
 
-Wii and GameCube games appear together in one coverflow. There is no source
-menu, no view switching, no settings, no categories, no favorites, no delete.
-Pressing HOME simply exits WiiFlow.
+## Install
 
-## On-screen hint
+Download the [latest release](https://github.com/gaavin/WiiFlow-Kids/releases/latest)
+and extract it to the root of your SD card, then add your games:
 
-A persistent **(A) Play** hint sits under the coverflow, using the same
-translation key as the PLAY button so the two never disagree. The glyph is
-compiled into `boot.dol`, so no extra file has to reach the SD card.
+    sd:/wbfs/<Title> [ID6]/<ID6>.wbfs      Wii
+    sd:/games/<Title> [ID6]/game.ciso      GameCube
 
-## GameCube games look like GameCube games
+Launch it from the Homebrew Channel, or install `wad/WiiFlow_Kids_Channel.wad` for
+a Wii Menu channel. The channel is a forwarder — it boots
+`sd:/apps/wiiflow/boot.dol`, so updating later means replacing that one file.
 
-Upstream shows one Wii-branded `?` case for every game missing cover art, so a
-GameCube title looked like a Wii title. `_coverTexture()` now picks an indigo
-GameCube placeholder for `TYPE_GC_GAME`, including the case back and spine
-behind a flat cover. Both placeholders are embedded in the dol, so they need no
-theme support and cannot go missing from the SD card.
+Cover art is optional. It goes in `sd:/wiiflow/covers/<ID6>.png` (160x224) and
+`sd:/wiiflow/boxcovers/<ID6>.png` (1024x680), both from
+[GameTDB](https://www.gametdb.com), under the `wii` path for GameCube discs too.
 
-## What was removed
+## Opinionated by design
 
-The old WiiFlow UI is gone from the build, not merely hidden. These files were
-deleted outright:
+**Games come back here.** Pressing HOME in a game and choosing "Wii Menu" returns
+to WiiFlow rather than the System Menu.
 
-    menu_about        menu_config_gc        menu_paths
-    menu_categories   menu_config_gc_game   menu_plugin
-    menu_cftheme      menu_config_hb        menu_sm_editor
-    menu_cheat        menu_config_main      menu_source
-    menu_code         menu_config_source    menu_wad
-    menu_config_boot  menu_explorer         menu_wbfs
-    menu_config_coverbnr  menu_gameinfo     menu_partitions
-    menu_config_game  gc_disc_dump (GameCube disc dumping)
+**The look ships inside `boot.dol`.** Background, buttons, arrows, typeface, theme
+colours and the coverflow layout are all compiled in, so the build renders
+correctly even if nothing but the dol reaches the card.
 
-Three files were reduced to the non-UI helpers the child's screen still needs,
-and renamed to match what they now are:
+**Sized for a couch.** Type runs a few points larger than stock throughout.
 
-  - `menu_download.cpp` -> `menu_network.cpp` — network bring-up, plus the
-    worker thread and progress bar shown while covers are cached on first boot
-  - `menu_home.cpp` -> `menu_covercache.cpp` — cover PNG to `.wfc` conversion
-  - `menu_nandemu.cpp` -> `menu_emunand.cpp` — locating the emuNAND partition
-    and checking for saves, which booting a game still needs
+## Configuring
 
-Also removed: 179 dead method declarations and 102 dead widget members from
-`menu.hpp`.
+There is no settings UI — edit the ini files by hand with WiiFlow closed:
 
-## How the combined list works
+| file | controls |
+|---|---|
+| `sd:/apps/wiiflow/wiiflow_lite.ini` | main config |
+| `sd:/wiiflow/themes_lite/default.ini` | text colours and font sizes |
+| `sd:/wiiflow/themes_lite/coverflows/default.ini` | cover layout and the view modes **1**/**2** cycle |
 
-`m_current_view` is a bitmask, so pinning it to
-`KIDS_VIEW = COVERFLOW_WII | COVERFLOW_GAMECUBE` (see `source/types.h`) makes
-`_loadGameList()` load both lists into one coverflow. `_launch()` re-derives the
-storage partition from each game's own `hdr->type` before booting, so a mixed
-list boots correctly — the same mechanism upstream's `directlaunch()` relies on.
-
-## Safety rails
-
-Favorites filtering is forced off and category filters are cleared on boot.
-The buttons that toggle them no longer exist, so a stale filter would otherwise
-strand the child on an empty coverflow with no way to recover. Hidden categories
-are deliberately left intact, so a parent can still keep titles out of sight.
-
-## Configuring it
-
-There is no settings UI. Edit `wiiflow.ini` on the SD card by hand, or run a
-stock WiiFlow build once to set things up.
+Anything in those files overrides the copy compiled into the dol. Delete a file and
+the built-in takes over again, so a bad edit cannot lock you out.
 
 ## Building
 
-GitHub Actions builds every push (`.github/workflows/main.yml`) with pinned
-devkitPPC r42.2-1 and libogc 2.4.0, and uploads a `wiiflow_kids_<sha>`
-artifact (`apps/` + `wiiflow/` for the SD card).
-
-Locally:
-
     scripts/build.sh
 
-`scripts/env.sh` locates GNU make, sets `DEVKITPRO`/`DEVKITPPC` (default
-`/tmp/devkitpro/opt/devkitpro`), and on aarch64 runs the x86_64 toolchain
-under box64 with `BOX64_DYNAREC=0` (GCC 12 ICEs in libstdc++ constexpr
-when the dynarec is on).
+`scripts/env.sh` locates GNU make and sets `DEVKITPRO`/`DEVKITPPC` (default
+`/tmp/devkitpro/opt/devkitpro`). On aarch64 it runs the x86_64 toolchain under
+box64 with `BOX64_DYNAREC=0`, because GCC 12 ICEs in libstdc++ constexpr with the
+dynarec on. Everything else — libpng, freetype, wolfSSL, custom fat/ntfs/ext2 — is
+vendored in `portlibs/` and `source/libwolfssl/`.
 
-Locally: devkitPPC + libogc, then `make` from the repository root. Everything
-else (libpng, freetype, wolfSSL, custom fat/ntfs/ext2) is vendored in
-`portlibs/` and `source/libwolfssl/`.
+`scripts/package_release.sh` assembles the release zip. The artwork is generated,
+not hand-drawn: `scripts/kids_background.py`, `kids_theme.py` and `kids_splash.py`
+render the background, chrome and boot splash.
 
-Verified building clean against devkitPPC r42.2 / GCC 12.2.0 with zero
-compiler warnings. Stripping the old UI took `boot.dol` from 4,580,256 to
-3,921,824 bytes.
+## Credits
 
----
-
-# WiiFlow Lite
-My mod of the Wii USB Loader WiiFlow
-
-## Description
-WiiFlow Lite is a wii homebrew app used to display and launch your games and apps stored on a USB device or SD card plugged into a Wii or Wii U in Wii mode. The games and apps are displayed in cover flow style display.
-
-## Installing
-As of v5.2.0 WiiFlow Lite will simply be a replacement for WiiFlow. Put it in apps/wiiflow and use wiiflow forwarder's to launch it via the wii system menu. forwarders can be found on wiiflowiki4. for previous wiiflow lite users, sorry but you must uninstall your wiiflow lite forwarder and replace it with a wiiflow forwarder.
-
-Simply download the latest release and extract it to your apps/wiiflow folder on SD or USB HDD. SD is recommended. Your device should be formatted to FAT32.
-
-## Booting
-To start WiiFlow Lite you will need the Homebrew Channel or a WiiFlow forwarder channel installed on your Wii or vWii system menu.
-
-## Themes
-Currently only Rhapsodii and Rhapsodii Shima themes are compatible with WiiFlow Lite. Other older wiiflow themes need to be updated to work properly with WFL.
-
-Rhapsodii made by Hakaisha is a new theme designed for wiiflow lite. find it here - (https://gbatemp.net/threads/wiiflow-lite-theme-rhapsodii.511833/)
-
-Other wiiflow lite themes can be found on the wiki linked below. but they need to be updated to properly work with wiiflow lite.
-
-## Useful Links
-[WiiFlow Lite GBATemp thread](https://gbatemp.net/threads/wiiflow-lite.422685/)
-
-[WiiFlow Wiki](https://web.archive.org/web/20220414124727/https://sites.google.com/site/wiiflowiki4/)
-
-[Newer Wiki WIP](https://sites.google.com/view/wiiflow-wiki/welcome)
-
-[Github Wiki](https://github.com/Fledge68/WiiFlow_Lite/wiki)
-
-[Old Sourceforge Project Repository](https://sourceforge.net/projects/wiiflow-lite/)
+[WiiFlow Lite](https://github.com/Fledge68/WiiFlow_Lite) by Fledge68, built on
+WiiFlow by the original authors. Channel forwarder from
+[wyndchyme/wiiflow-forwarder](https://github.com/wyndchyme/wiiflow-forwarder)
+(Apache-2.0), retextured here. Cover art from GameTDB. Bundled typeface is Open
+Sans (Apache-2.0).
