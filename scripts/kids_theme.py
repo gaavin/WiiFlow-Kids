@@ -1,64 +1,89 @@
 #!/usr/bin/env python3
-"""Kids UI 9-slice capsules and page arrows.
+"""Kids UI chrome: 9-slice glass capsules and coverflow arrows.
 
-Highlight varies only with y so the 4px centre strip is identical to
-column 47 of the left cap (and column 0 of the right cap).
+Rendered at twice the on-screen size. CButtonsMgr::_drawBtn lays the caps
+out as squares of the button's height and stretches the centre strip
+between them (gui.cpp), with UVs spanning the whole texture — so texture
+resolution is free and a 2x source is simply downsampled by the GPU
+instead of being magnified. Same reason the arrows are 160px for an 80px
+slot.
+
+The seam invariant from the first pass still holds: every shading term is
+a function of y alone, so the stretched centre strip cannot band against
+the rounded caps. The centre is taken from the left cap's own last column
+and asserted equal to the right cap's first column.
 """
 from __future__ import annotations
 
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 OUT = Path(__file__).resolve().parents[1] / "out" / "imgs"
-H = 48
-CAP = 48
-CENTRE_W = 4
-R = 23  # capsule radius inside 48x48
+
+H = 96          # 2x the 48px the button slot used to magnify
+CAP = 96
+CENTRE_W = 8
+R = 46          # capsule radius inside the cap
+AA = 4          # supersample for the rounded ends
 
 
 def lerp(a, b, t):
-    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+    return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
 
 
-def row_rgb(y, top, bot, hi_rgb, hi_amt):
-    t = y / (H - 1)
-    base = lerp(top, bot, t)
-    # glossy band near the top, y-only so every x matches
-    peak = math.exp(-((t - 0.18) ** 2) / (2 * 0.07 ** 2))
-    hi = hi_amt * peak
-    return tuple(min(255, int(base[i] + (hi_rgb[i] - base[i]) * hi)) for i in range(3))
+def row_rgb(t, top, bot, hi_amt):
+    """Capsule shading for a normalised height t. Function of y only."""
+    base = lerp(top, bot, t ** 1.08)
+
+    # glass shelf: bright across the upper half, cut at the midline
+    gloss = math.exp(-((t - 0.16) ** 2) / (2 * 0.115 ** 2))
+    if t > 0.47:
+        gloss *= max(0.0, 1.0 - (t - 0.47) / 0.06)
+    col = lerp(base, (255, 255, 255), min(1.0, gloss * hi_amt))
+
+    # bounce light along the bottom edge, the other half of the glass read
+    bounce = math.exp(-((t - 0.88) ** 2) / (2 * 0.085 ** 2)) * 0.22
+    col = lerp(col, (255, 255, 255), bounce)
+
+    # slight darkening just under the shelf so the two halves separate
+    shade = math.exp(-((t - 0.56) ** 2) / (2 * 0.10 ** 2)) * 0.13
+    return lerp(col, (0, 0, 0), shade)
 
 
-def draw_capsule(top, bot, hi_rgb, hi_amt, side: str) -> Image.Image:
-    img = Image.new("RGBA", (CAP, H), (0, 0, 0, 0))
-    px = img.load()
-    cx = R if side == "left" else (CAP - 1 - R)
-    for y in range(H):
-        rgb = row_rgb(y, top, bot, hi_rgb, hi_amt)
-        for x in range(CAP):
+def cap(top, bot, hi_amt, side):
+    """One rounded end, supersampled then reduced for clean edges."""
+    n = AA
+    big = Image.new("RGBA", (CAP * n, H * n), (0, 0, 0, 0))
+    px = big.load()
+    r = R * n
+    cy = (H * n - 1) / 2
+    cx = r if side == "left" else (CAP * n - 1 - r)
+    for y in range(H * n):
+        t = y / (H * n - 1)
+        rgb = row_rgb(t, top, bot, hi_amt)
+        for x in range(CAP * n):
             if side == "left":
-                inside = x >= cx or (x - cx) ** 2 + (y - (H - 1) / 2) ** 2 <= R * R
+                inside = x >= cx or (x - cx) ** 2 + (y - cy) ** 2 <= r * r
             else:
-                inside = x <= cx or (x - cx) ** 2 + (y - (H - 1) / 2) ** 2 <= R * R
-            if inside:
-                # slight edge darken for a clean rim
-                rim = 0.0
-                if side == "left" and x < cx:
-                    d = math.sqrt((x - cx) ** 2 + (y - (H - 1) / 2) ** 2)
-                    if R - 1.6 <= d <= R:
-                        rim = (d - (R - 1.6)) / 1.6
-                if side == "right" and x > cx:
-                    d = math.sqrt((x - cx) ** 2 + (y - (H - 1) / 2) ** 2)
-                    if R - 1.6 <= d <= R:
-                        rim = (d - (R - 1.6)) / 1.6
-                shade = tuple(int(c * (1.0 - 0.22 * rim)) for c in rgb)
-                px[x, y] = (*shade, 255)
-    return img
+                inside = x <= cx or (x - cx) ** 2 + (y - cy) ** 2 <= r * r
+            if not inside:
+                continue
+            col = rgb
+            # rim light on the curved edge only; never reaches the seam column
+            beyond = (side == "left" and x < cx) or (side == "right" and x > cx)
+            if beyond:
+                d = math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+                if d >= r - 2.2 * n:
+                    k = (d - (r - 2.2 * n)) / (2.2 * n)
+                    col = lerp(col, (255, 255, 255), 0.30 * k) if t < 0.5 else \
+                        lerp(col, (0, 0, 0), 0.16 * k)
+            px[x, y] = (int(col[0]), int(col[1]), int(col[2]), 255)
+    return big.resize((CAP, H), Image.Resampling.LANCZOS)
 
 
-def centre_from_left(left: Image.Image) -> Image.Image:
+def centre_from(left):
     col = left.crop((CAP - 1, 0, CAP, H))
     img = Image.new("RGBA", (CENTRE_W, H), (0, 0, 0, 0))
     for x in range(CENTRE_W):
@@ -66,62 +91,74 @@ def centre_from_left(left: Image.Image) -> Image.Image:
     return img
 
 
-def assert_seam(left: Image.Image, centre: Image.Image, right: Image.Image):
-    lp = left.load()
-    cp = centre.load()
-    rp = right.load()
+def assert_seam(left, centre, right):
+    lp, cp, rp = left.load(), centre.load(), right.load()
     for y in range(H):
-        assert lp[CAP - 1, y] == cp[0, y] == rp[0, y], f"seam mismatch y={y}"
+        assert lp[CAP - 1, y] == cp[0, y] == rp[0, y], f"seam mismatch at y={y}"
 
 
-def arrow(point_right: bool, fill, outline) -> Image.Image:
-    img = Image.new("RGBA", (80, 80), (0, 0, 0, 0))
-    # supersample
-    s = 4
-    big = Image.new("RGBA", (80 * s, 80 * s), (0, 0, 0, 0))
+def arrow(point_right, face, edge, size=160):
+    """A round glass button with a fat chevron — a clear target for a kid."""
+    n = 4
+    big = Image.new("RGBA", (size * n, size * n), (0, 0, 0, 0))
     d = ImageDraw.Draw(big)
-    if point_right:
-        tri = [(22 * s, 16 * s), (22 * s, 64 * s), (62 * s, 40 * s)]
-    else:
-        tri = [(58 * s, 16 * s), (58 * s, 64 * s), (18 * s, 40 * s)]
-    d.polygon(tri, fill=fill + (255,), outline=outline + (255,))
-    # thicker outline
-    d.line(tri + [tri[0]], fill=outline + (255,), width=3 * s)
-    return big.resize((80, 80), Image.Resampling.LANCZOS)
+    c = size * n / 2
+    r = size * n * 0.44
+
+    # drop shadow, then the glass disc
+    d.ellipse([c - r, c - r + r * 0.08, c + r, c + r + r * 0.08], fill=(10, 40, 70, 70))
+    for i in range(int(r), 0, -1):
+        t = 1 - i / r
+        col = lerp(face, edge, t ** 0.7)
+        d.ellipse([c - i, c - i, c + i, c + i], fill=(*[int(v) for v in col], 255))
+    d.ellipse([c - r, c - r, c + r, c + r], outline=(255, 255, 255, 235),
+              width=int(r * 0.075))
+
+    # upper glass shelf
+    shelf = Image.new("RGBA", big.size, (0, 0, 0, 0))
+    ds = ImageDraw.Draw(shelf)
+    ds.ellipse([c - r * 0.86, c - r * 0.90, c + r * 0.86, c + r * 0.16],
+               fill=(255, 255, 255, 120))
+    mask = Image.new("L", big.size, 0)
+    ImageDraw.Draw(mask).ellipse([c - r, c - r, c + r, c + r], fill=255)
+    shelf.putalpha(Image.composite(shelf.getchannel("A"), Image.new("L", big.size, 0), mask))
+    big.alpha_composite(shelf.filter(ImageFilter.GaussianBlur(r * 0.05)))
+
+    # chevron
+    s = r * 0.46
+    xo = r * 0.10 * (1 if point_right else -1)
+    pts = [(-0.35, -0.75), (0.30, 0.0), (-0.35, 0.75)]
+    if not point_right:
+        pts = [(-x, y) for x, y in pts]
+    line = [(c + xo + x * s, c + y * s) for x, y in pts]
+    d.line(line, fill=(20, 56, 92, 190), width=int(s * 0.62), joint="curve")
+    d.line([(x, y - s * 0.06) for x, y in line], fill=(255, 255, 255, 255),
+           width=int(s * 0.42), joint="curve")
+    return big.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    # richer sky blue — still light enough for navy text
-    blue_top, blue_bot = (86, 196, 255), (32, 132, 214)
-    # candy gold selected
-    gold_top, gold_bot = (255, 224, 86), (242, 168, 24)
-    hi = (255, 255, 255)
 
-    left = draw_capsule(blue_top, blue_bot, hi, 0.45, "left")
-    right = draw_capsule(blue_top, blue_bot, hi, 0.45, "right")
-    centre = centre_from_left(left)
-    assert_seam(left, centre, right)
+    sky_top, sky_bot = (150, 226, 255), (22, 122, 208)
+    gold_top, gold_bot = (255, 232, 128), (232, 150, 16)
 
-    sleft = draw_capsule(gold_top, gold_bot, hi, 0.40, "left")
-    sright = draw_capsule(gold_top, gold_bot, hi, 0.40, "right")
-    scentre = centre_from_left(sleft)
-    assert_seam(sleft, scentre, sright)
+    for name, (top, bot, hi) in {
+        "": (sky_top, sky_bot, 0.62),
+        "s": (gold_top, gold_bot, 0.55),
+    }.items():
+        left = cap(top, bot, hi, "left")
+        right = cap(top, bot, hi, "right")
+        centre = centre_from(left)
+        assert_seam(left, centre, right)
+        left.save(OUT / f"but{name}left.png", optimize=True)
+        centre.save(OUT / f"but{name}center.png", optimize=True)
+        right.save(OUT / f"but{name}right.png", optimize=True)
 
-    left.save(OUT / "butleft.png", optimize=True)
-    centre.save(OUT / "butcenter.png", optimize=True)
-    right.save(OUT / "butright.png", optimize=True)
-    sleft.save(OUT / "butsleft.png", optimize=True)
-    scentre.save(OUT / "butscenter.png", optimize=True)
-    sright.save(OUT / "butsright.png", optimize=True)
-
-    cyan = (64, 210, 255)
-    navy = (18, 32, 56)
-    gold = (255, 210, 48)
-    arrow(False, cyan, navy).save(OUT / "btnprev.png", optimize=True)
-    arrow(True, cyan, navy).save(OUT / "btnnext.png", optimize=True)
-    arrow(False, gold, navy).save(OUT / "btnprevs.png", optimize=True)
-    arrow(True, gold, navy).save(OUT / "btnnexts.png", optimize=True)
+    arrow(False, (168, 234, 255), (28, 132, 214)).save(OUT / "btnprev.png", optimize=True)
+    arrow(True, (168, 234, 255), (28, 132, 214)).save(OUT / "btnnext.png", optimize=True)
+    arrow(False, (255, 238, 150), (236, 152, 20)).save(OUT / "btnprevs.png", optimize=True)
+    arrow(True, (255, 238, 150), (236, 152, 20)).save(OUT / "btnnexts.png", optimize=True)
     print("wrote", OUT)
 
 
