@@ -6,7 +6,6 @@ Controls:
 -- Home  =  Open Home Menu / Exit WiiFlow
 -- Home (sourceflow/menu)  =  Open source menu config
 -- Home (homebrew flow)  =  Open homebrew flow config
--- 1 / 2  =  Previous / next coverflow layout
 -- A  =  Select game
 -- B  =  Open Source Menu (if installed)
 -- B+A  =  Launch game immediately

@@ -196,9 +196,8 @@ int CMenu::main(void)
 	wstringEx curLetter;
 	string prevTheme = m_themeName;
 	m_reload = false;
-	/* Kids UI: 1/2 still cycle layouts during a session, but every boot
-	   opens on layout 1 (the seven-cover wheel). */
-	CFLocked = false;
+	/* Kids UI: stay on the default seven-cover wheel. 1/2 do not cycle layouts. */
+	CFLocked = true;
 	m_cfg.setInt(WII_DOMAIN, "last_cf_mode", 1);
 	m_cfg.setInt(GC_DOMAIN, "last_cf_mode", 1);
 	/* Kids UI: never fade icons in and out on hover - a child should not have
@@ -327,18 +326,6 @@ int CMenu::main(void)
 				CoverFlow.pageUp();
 			else if(BTN_PLUS_PRESSED)
 				CoverFlow.pageDown();
-				
-			/* change coverflow layout/mode */
-			else if((BTN_1_PRESSED || BTN_2_PRESSED) && !CFLocked && !CoverFlow.empty())
-			{
-				u32 curPos = CoverFlow._currentPos();
-				s8 direction = BTN_1_PRESSED ? 1 : -1;
-				int cfVersion = 1 + loopNum((_getCFVersion() - 1) + direction, m_numCFVersions);
-				_setCFVersion(cfVersion);
-				_loadCFLayout(cfVersion);
-				CoverFlow._setCurPos(curPos);
-				CoverFlow.applySettings();
-			}
 		}
 		else // Button B Held
 		{
