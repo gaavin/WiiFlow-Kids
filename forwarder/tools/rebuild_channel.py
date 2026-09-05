@@ -43,6 +43,8 @@ REPLACEMENTS = {
     "banner_sil_spo.tpl": ROOT / "banner_sil_spo.png",
     "menubnr_sil_res.tpl": ROOT / "menubnr_sil_res.png",
     "menubnr_sil_spo.tpl": ROOT / "menubnr_sil_spo.png",
+    "banner_Nintendo.tpl": ROOT / "banner_Nintendo.png",
+    "banner_Dolby.tpl": ROOT / "banner_Dolby.png",
 }
 
 
@@ -82,11 +84,43 @@ def tpl_fmt(blob):
     return w, h, fmt
 
 
+def stretch_banner_bg(brlyt: bytes) -> bytes:
+    """Grow P_BG to the full 608x456 root pane so the sky/ocean fill
+    covers the old black ticker rows (they sat below the 347px background)."""
+    off = 0x10
+    out = bytearray(brlyt)
+    while off + 8 <= len(brlyt):
+        mag = brlyt[off:off + 4]
+        sz = struct.unpack(">I", brlyt[off + 4:off + 8])[0]
+        if mag == b"pic1":
+            p = off + 8
+            name = brlyt[p + 4:p + 20].split(b"\0", 1)[0]
+            if name == b"P_BG":
+                ty = struct.unpack(">f", brlyt[p + 32:p + 36])[0]
+                h = struct.unpack(">f", brlyt[p + 64:p + 68])[0]
+                out[p + 32:p + 36] = struct.pack(">f", 0.0)
+                out[p + 64:p + 68] = struct.pack(">f", 456.0)
+                print(f"  P_BG ty {ty} -> 0, height {h} -> 456")
+                return bytes(out)
+        if sz < 8:
+            break
+        off += sz
+    raise SystemExit("P_BG pane not found in banner.brlyt")
+
+
 def patch_u8(raw: bytes, label: str) -> bytes:
     ents, meta = u8.parse(raw, 0)
     out = bytearray(raw)
     for e in ents:
-        if e["type"] != 0 or e["name"] not in REPLACEMENTS:
+        if e["type"] != 0:
+            continue
+        if e["name"] == "banner.brlyt":
+            patched = stretch_banner_bg(bytes(out[e["data_off"]:e["data_off"] + e["size"]]))
+            if len(patched) != e["size"]:
+                raise SystemExit("banner.brlyt size changed")
+            out[e["data_off"]:e["data_off"] + e["size"]] = patched
+            continue
+        if e["name"] not in REPLACEMENTS:
             continue
         png = Image.open(REPLACEMENTS[e["name"]]).convert("RGBA")
         w, h, fmt = tpl_fmt(raw[e["data_off"]:e["data_off"] + e["size"]])

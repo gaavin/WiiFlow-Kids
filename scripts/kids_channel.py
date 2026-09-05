@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Kids channel artwork: Frutiger Aero sky, glass wordmark, kid-friendly lines.
+"""Kids channel artwork: one Frutiger Aero scene, sliced into the existing panes.
 
-Replaces the Sports-base / USB-loader textures in the Wii Menu forwarder
-with the same glass-and-sky language as the in-app theme. Sizes are the
-exact TPL dimensions the existing .brlyt panes expect — the layout and
-animation files are never touched.
+The Wii Menu layout (brlyt/brlan) is not rewritten. The Sports-base ticker
+and USB/SD leftovers go away because those textures become fully transparent
+and the background pane is stretched to fill the banner. The 496x169 logo
+pane carries the actual scene plus the WiiFlow KIDS wordmark.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "forwarder"
+ART = OUT / "art"
 FONT = ROOT / "out" / "imgs" / "font.ttf"
 
 NAVY = (18, 44, 78)
@@ -25,128 +26,94 @@ def lerp(a, b, t):
     return tuple(a[i] + (b[i] - a[i]) * t for i in range(len(a)))
 
 
-def vgrad(size, stops):
-    w, h = size
-    strip = Image.new("RGB", (1, 256))
-    px = strip.load()
-    for y in range(256):
-        t = y / 255
-        col = stops[-1][1]
-        for i in range(len(stops) - 1):
-            p0, c0 = stops[i]
-            p1, c1 = stops[i + 1]
-            if p0 <= t <= p1:
-                col = lerp(c0, c1, 0 if p1 == p0 else (t - p0) / (p1 - p0))
-                break
-        px[0, y] = tuple(int(v) for v in col)
-    return strip.resize((w, h), Image.Resampling.BICUBIC)
+def cover(im: Image.Image, size) -> Image.Image:
+    """Scale-and-crop to fill size, centre-weighted."""
+    tw, th = size
+    im = im.convert("RGBA")
+    sw, sh = im.size
+    scale = max(tw / sw, th / sh)
+    nw, nh = int(sw * scale + 0.5), int(sh * scale + 0.5)
+    im = im.resize((nw, nh), Image.Resampling.LANCZOS)
+    x = (nw - tw) // 2
+    y = max(0, (nh - th) // 2 - nh // 20)  # a touch toward the sky/dolphins
+    return im.crop((x, y, x + tw, y + th))
 
 
-SKY = [
-    (0.00, (210, 242, 255)),
-    (0.28, (140, 214, 252)),
-    (0.52, (64, 176, 236)),
-    (0.72, (28, 142, 216)),
-    (1.00, (18, 108, 186)),
-]
+def band(im: Image.Image, y0_frac, y1_frac, size) -> Image.Image:
+    """Horizontal slice of a scene, scaled to size, opaque."""
+    im = im.convert("RGBA")
+    w, h = im.size
+    y0, y1 = int(h * y0_frac), int(h * y1_frac)
+    y1 = max(y1, y0 + 1)
+    strip = im.crop((0, y0, w, y1))
+    return strip.resize(size, Image.Resampling.LANCZOS)
 
 
-def sky_strip(w, h):
-    return vgrad((w, h), SKY).convert("RGBA")
+def vstrip(im: Image.Image, size) -> Image.Image:
+    """1-pixel-wide (then widened) vertical colour sample of a scene."""
+    tw, th = size
+    im = im.convert("RGB").resize((1, th), Image.Resampling.LANCZOS)
+    return im.resize((tw, th), Image.Resampling.NEAREST).convert("RGBA")
 
 
-def glass_capsule(img, box, radius):
-    """Frutiger Aero pill: sky wash, upper shelf, white rim."""
-    x0, y0, x1, y1 = box
-    w, h = img.size
-    mask = Image.new("L", (w, h), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(box, radius=radius, fill=255)
-    wash = vgrad((w, h), [
-        (0.00, (230, 248, 255)), (0.35, (160, 220, 250)),
-        (0.52, (80, 180, 236)), (1.00, (36, 140, 214)),
-    ])
-    body = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    body.paste(wash, (0, 0))
-    body.putalpha(mask)
-    img.alpha_composite(body)
-    shelf = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(shelf).rounded_rectangle(
-        [x0 + h * 0.04, y0 + h * 0.05, x1 - h * 0.04, (y0 + y1) * 0.48],
-        radius=radius * 0.7, fill=(255, 255, 255, 110))
-    shelf.putalpha(Image.composite(shelf.getchannel("A"), Image.new("L", (w, h), 0), mask))
-    img.alpha_composite(shelf.filter(ImageFilter.GaussianBlur(h * 0.012)))
-    rim = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(rim).rounded_rectangle(box, radius=radius, outline=(255, 255, 255, 230),
-                                          width=max(2, int(h * 0.025)))
-    img.alpha_composite(rim)
-
-
-def wordmark(size, left="WiiFlow", right="KIDS", scale=0.42, gap_frac=0.07, capsule=False):
-    """Glass wordmark on a transparent field, authored oversized then reduced."""
-    w, h = size
+def wordmark_on(scene: Image.Image, scale=0.28, y_frac=0.42):
+    """Draw WiiFlow KIDS onto a scene. Text only — the scene is the art."""
+    w, h = scene.size
     s = 4
     sw, sh = w * s, h * s
-    img = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
-    if capsule:
-        pad_x, pad_y = sw * 0.04, sh * 0.10
-        glass_capsule(img, (pad_x, pad_y, sw - pad_x, sh - pad_y), sh * 0.38)
+    big = scene.resize((sw, sh), Image.Resampling.LANCZOS)
     font = ImageFont.truetype(str(FONT), int(sh * scale))
-    d = ImageDraw.Draw(img)
-    gap = sh * gap_frac
-    lw = d.textlength(left, font=font)
-    rw = d.textlength(right, font=font)
+    dprobe = ImageDraw.Draw(big)
+    left, right = "WiiFlow", "KIDS"
+    gap = sh * 0.06
+    lw = dprobe.textlength(left, font=font)
+    rw = dprobe.textlength(right, font=font)
     x = (sw - (lw + gap + rw)) / 2
-    y = sh * 0.50
+    y = sh * y_frac
 
-    # soft contact shadow so the type sits on the sky rather than floating
     shadow = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
     ds = ImageDraw.Draw(shadow)
     sx = x
     for text, tw in ((left, lw), (right, rw)):
-        ds.text((sx, y + sh * 0.03), text, font=font, fill=(*NAVY, 140), anchor="lm")
+        ds.text((sx, y + sh * 0.02), text, font=font, fill=(*NAVY, 160), anchor="lm")
         sx += tw + gap
-    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(sh * 0.018)))
+    big.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(sh * 0.016)))
 
-    d = ImageDraw.Draw(img)
+    d = ImageDraw.Draw(big)
     for text, tw, fill in ((left, lw, WHITE), (right, rw, GOLD)):
         d.text((x, y), text, font=font, fill=(*fill, 255), anchor="lm")
         x += tw + gap
-
-    # glass sheen across the upper half of the letters
-    shine = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
-    ImageDraw.Draw(shine).rectangle([0, sh * 0.22, sw, sh * 0.46], fill=(255, 255, 255, 50))
-    alpha = img.getchannel("A")
-    shine.putalpha(Image.composite(shine.getchannel("A"), Image.new("L", (sw, sh), 0), alpha))
-    img.alpha_composite(shine.filter(ImageFilter.GaussianBlur(sh * 0.02)))
-    return img.resize((w, h), Image.Resampling.LANCZOS)
+    return big.resize((w, h), Image.Resampling.LANCZOS)
 
 
-def line_strip(size, text, scale=0.46):
-    """White glyph, coverage in alpha — no dark fringe on the sky behind it."""
-    w, h = size
-    s = 4
-    sw, sh = w * s, h * s
-    ink = Image.new("L", (sw, sh), 0)
-    font = ImageFont.truetype(str(FONT), int(sh * scale))
-    ImageDraw.Draw(ink).text((sw / 2, sh / 2), text, font=font, fill=255, anchor="mm")
-    ink = ink.resize((w, h), Image.Resampling.LANCZOS)
-    img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-    img.putalpha(ink)
-    return img
+def empty(size):
+    return Image.new("RGBA", size, (0, 0, 0, 0))
 
 
 def main():
-    OUT.mkdir(parents=True, exist_ok=True)
+    scene = Image.open(ART / "scene.jpg")
+
+    banner_logo = wordmark_on(cover(scene, (496, 169)), scale=0.30, y_frac=0.38)
+    icon_logo = wordmark_on(cover(scene, (120, 48)), scale=0.34, y_frac=0.50)
+
     assets = {
-        "banner_logo.png": wordmark((496, 169), scale=0.36, capsule=True),
-        "menubnr_logo.png": wordmark((120, 48), scale=0.40, gap_frac=0.06, capsule=True),
-        "banner_BG.png": sky_strip(4, 347),
-        "menubnr_BG.png": sky_strip(2, 96),
-        "banner_sil_res.png": line_strip((614, 48), "Pick a game and play!"),
-        "banner_sil_spo.png": line_strip((614, 48), "Have fun."),
-        "menubnr_sil_res.png": line_strip((116, 32), "Let's play!", scale=0.50),
-        "menubnr_sil_spo.png": Image.new("RGBA", (120, 32), (0, 0, 0, 0)),
+        "banner_logo.png": banner_logo,
+        "menubnr_logo.png": icon_logo,
+        # sky-to-water only — the coral at the bottom of the scene would
+        # otherwise paint a pink band around the logo pane.
+        "banner_BG.png": vstrip(scene.crop((0, 0, scene.size[0], int(scene.size[1] * 0.62))), (4, 347)),
+        "menubnr_BG.png": vstrip(scene.crop((0, 0, scene.size[0], int(scene.size[1] * 0.62))), (2, 96)),
+        # tickers used to be black bars of scrolling text. Fully transparent
+        # so the stretched sky/ocean background shows through instead.
+        "banner_sil_res.png": empty((614, 48)),
+        "banner_sil_spo.png": empty((614, 48)),
+        "menubnr_sil_res.png": empty((116, 32)),
+        "menubnr_sil_spo.png": empty((120, 32)),
+        # SD / Wii leftovers from the Sports-base forwarder
+        "banner_Nintendo.png": empty((108, 40)),
+        "banner_Dolby.png": empty((96, 40)),
     }
+    OUT.mkdir(parents=True, exist_ok=True)
     for name, img in assets.items():
         path = OUT / name
         img.save(path, optimize=True)
