@@ -25,7 +25,6 @@
 #include "loader/wbfs.h"
 #include "music/gui_sound.h"
 #include "music/MusicPlayer.hpp"
-#include "plugin/plugin.hpp"
 #include "sicksaxis-wrapper/sicksaxis-wrapper.h"
 #include "wiiuse/wpad.h"
 #include "wupc/wupc.h"
@@ -155,8 +154,6 @@ private:
 	string m_bckgrndsDir;
 
 	string m_sourceDir;
-	string m_pluginsDir;
-	string m_pluginDataDir;
 	string m_cartDir;
 	string m_snapDir;
 
@@ -614,9 +611,6 @@ private:
 	bool _loadList(void);
 	bool _loadWiiList(void);
 	bool _loadGamecubeList(void);
-	bool _loadChannelList(void);
-	bool _loadPluginList(void);
-	bool _loadHomebrewList(const char *HB_Dir);
 	void _initCF(void);
 	
 //background handling functions
@@ -654,10 +648,8 @@ private:
 //game boot functions
 	void _launch(const dir_discHdr *hdr);
 	void _launchWii(dir_discHdr *hdr, bool dvd);
-	void _launchChannel(dir_discHdr *hdr);
 	void _launchHomebrew(const char *filepath, vector<string> arguments);
 	void _launchGC(dir_discHdr *hdr, bool disc);
-	void _launchPlugin(dir_discHdr *hdr);
 	void _launchShutdown();
 	vector<string> _getMetaXML(const char *bootpath);
 	int _loadGameIOS(u8 ios, int userIOS, const char *id, bool RealNAND_Channels = false);

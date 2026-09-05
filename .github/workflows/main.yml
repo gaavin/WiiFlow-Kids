@@ -39,7 +39,7 @@ jobs:
 
       - name: Compile
         run: |
-          PATH=$(pwd)/devkitpro/devkitPPC/bin:$PATH DEVKITPPC=$(pwd)/devkitpro/devkitPPC DEVKITPRO=$(pwd)/devkitpro make
+          DEVKITPRO=$(pwd)/devkitpro DEVKITPPC=$(pwd)/devkitpro/devkitPPC scripts/build.sh
 
       - name: Package
         run: |

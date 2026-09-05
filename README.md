@@ -73,10 +73,18 @@ stock WiiFlow build once to set things up.
 
 ## Building
 
-Built by GitHub Actions on every push (`.github/workflows/main.yml`), using
-pinned devkitPPC r42.2-1 and libogc 2.4.0. The run uploads a
-`wiiflow_kids_<sha>` artifact containing the complete `apps/` and `wiiflow/`
-folders to copy to your SD card.
+GitHub Actions builds every push (`.github/workflows/main.yml`) with pinned
+devkitPPC r42.2-1 and libogc 2.4.0, and uploads a `wiiflow_kids_<sha>`
+artifact (`apps/` + `wiiflow/` for the SD card).
+
+Locally:
+
+    scripts/build.sh
+
+`scripts/env.sh` locates GNU make, sets `DEVKITPRO`/`DEVKITPPC` (default
+`/tmp/devkitpro/opt/devkitpro`), and on aarch64 runs the x86_64 toolchain
+under box64 with `BOX64_DYNAREC=0` (GCC 12 ICEs in libstdc++ constexpr
+when the dynarec is on).
 
 Locally: devkitPPC + libogc, then `make` from the repository root. Everything
 else (libpng, freetype, wolfSSL, custom fat/ntfs/ext2) is vendored in

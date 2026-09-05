@@ -20,7 +20,6 @@ extern const u8 flatnopic_gc_png[];
 #include "gui/fmt.h"
 #include "gecko/gecko.hpp"
 #include "menu/menu.hpp"
-#include "plugin/plugin.hpp"
 #include "memory/mem2.hpp"
 #include "fileOps/fileOps.h"
 #include "wstringEx/wstringEx.hpp"
@@ -2836,10 +2835,7 @@ CCoverFlow::CLRet CCoverFlow::_loadCoverTex(u32 i, bool box, bool hq, bool blank
 
 	if(box && m_smallBox)// prevent smallbox from loading full box cover
 		return CL_ERROR;
-		
-	if(blankBoxCover && m_items[i].hdr->type == TYPE_SOURCE)// blank covers not used for sourceflow
-		return CL_ERROR;
-		
+
 	bool allocFailed = false;
 
 	/* try to find the wfc texture file in the cache folder */
@@ -2847,7 +2843,6 @@ CCoverFlow::CLRet CCoverFlow::_loadCoverTex(u32 i, bool box, bool hq, bool blank
 	{
 		char wfcTitle[128];
 		wfcTitle[127] = '\0';
-		const char *wfcCoverDir = NULL;
 		char *full_path = (char*)MEM2_alloc(MAX_FAT_PATH+1);
 		if(full_path == NULL)
 			return CL_NOMEM;
@@ -2865,39 +2860,10 @@ CCoverFlow::CLRet CCoverFlow::_loadCoverTex(u32 i, bool box, bool hq, bool blank
 		else
 			strncpy(wfcTitle, fmt("%s", getFilenameId(m_items[i].hdr)), sizeof(wfcTitle) - 1);
 			
-		/* get coverfolder for plugins, sourceflow, and homebrew */
-		if(m_items[i].hdr->type == TYPE_PLUGIN)
-			wfcCoverDir = m_plugin.GetCoverFolderName(m_items[i].hdr->settings[0]);
-		if(m_items[i].hdr->type == TYPE_SOURCE)
-			wfcCoverDir = "sourceflow";
-		if(m_items[i].hdr->type == TYPE_HOMEBREW)
-			wfcCoverDir = "homebrew";
-			
-		/* set full path of wfc file */
-		if(wfcCoverDir != NULL)
-		{
-			if(m_smallBox)
-				strncpy(full_path, fmt("%s/%s/%s_small.wfc", m_cachePath.c_str(), wfcCoverDir, wfcTitle), MAX_FAT_PATH);
-			else
-			{
-				strncpy(full_path, fmt("%s/%s/%s.wfc", m_cachePath.c_str(), wfcCoverDir, wfcTitle), MAX_FAT_PATH);
-				/*if(!fsop_FileExist(full_path))
-				{
-					if(strrchr(wfcTitle, '.') != NULL)
-					{
-						*strrchr(wfcTitle, '.') = '\0';
-						strncpy(full_path, fmt("%s/%s/%s.wfc", m_cachePath.c_str(), wfcCoverDir, wfcTitle), MAX_FAT_PATH);
-					}
-				}*/
-			}
-		}
+		if(m_smallBox)
+			strncpy(full_path, fmt("%s/%s_small.wfc", m_cachePath.c_str(), wfcTitle), MAX_FAT_PATH);
 		else
-		{
-			if(m_smallBox)
-				strncpy(full_path, fmt("%s/%s_small.wfc", m_cachePath.c_str(), wfcTitle), MAX_FAT_PATH);
-			else
-				strncpy(full_path, fmt("%s/%s.wfc", m_cachePath.c_str(), wfcTitle), MAX_FAT_PATH);
-		}
+			strncpy(full_path, fmt("%s/%s.wfc", m_cachePath.c_str(), wfcTitle), MAX_FAT_PATH);
 		DCFlushRange(full_path, MAX_FAT_PATH+1);
 		
 		/* load wfc file */

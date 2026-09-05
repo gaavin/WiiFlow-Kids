@@ -38,63 +38,7 @@ void CMenu::_hideMain(bool instant)
 
 void CMenu::_getCustomBgTex()
 {
-	{
-		curCustBg = loopNum(curCustBg + 1, 2);
-		string fn = "";
-		if(m_platform.loaded())
-		{
-			m_plugin.PluginMagicWord[0] = '\0';
-			u8 i = 0;
-			switch(m_current_view)
-			{
-				case COVERFLOW_CHANNEL:
-					if(m_cfg.getInt(CHANNEL_DOMAIN, "channels_type") & CHANNELS_REAL)
-						strncpy(m_plugin.PluginMagicWord, NAND_PMAGIC, 9);
-					else
-						strncpy(m_plugin.PluginMagicWord, ENAND_PMAGIC, 9);
-					break;
-				case COVERFLOW_HOMEBREW:
-					strncpy(m_plugin.PluginMagicWord, HB_PMAGIC, 9);
-					break;
-				case COVERFLOW_GAMECUBE:
-					strncpy(m_plugin.PluginMagicWord, GC_PMAGIC, 9);
-					break;
-				case COVERFLOW_PLUGIN:
-					while(m_plugin.PluginExist(i) && !m_plugin.GetEnabledStatus(i)) { ++i; }
-					if(m_plugin.PluginExist(i))
-						strncpy(m_plugin.PluginMagicWord, fmt("%08x", m_plugin.GetPluginMagic(i)), 8);
-					break;
-				default:// wii
-					strncpy(m_plugin.PluginMagicWord, WII_PMAGIC, 9);
-			}
-			if(strlen(m_plugin.PluginMagicWord) == 8)
-				fn = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "");
-		}
-		if(fn.length() > 0)
-		{
-			if(TexHandle.fromImageFile(m_mainCustomBg[curCustBg], fmt("%s/%s/%s.png", m_bckgrndsDir.c_str(), m_themeName.c_str(), fn.c_str())) != TE_OK)
-			{	
-				if(TexHandle.fromImageFile(m_mainCustomBg[curCustBg], fmt("%s/%s/%s.jpg", m_bckgrndsDir.c_str(), m_themeName.c_str(), fn.c_str())) != TE_OK)
-				{
-					if(TexHandle.fromImageFile(m_mainCustomBg[curCustBg], fmt("%s/%s.png", m_bckgrndsDir.c_str(), fn.c_str())) != TE_OK)
-					{
-						if(TexHandle.fromImageFile(m_mainCustomBg[curCustBg], fmt("%s/%s.jpg", m_bckgrndsDir.c_str(), fn.c_str())) != TE_OK)
-						{
-							curCustBg = loopNum(curCustBg + 1, 2);// reset it
-							customBg = false;
-							return;
-						}
-					}
-				}
-			}
-			customBg = true;
-		}
-		else
-		{
-			curCustBg = loopNum(curCustBg + 1, 2);// reset it
-			customBg = false;
-		}
-	}
+	customBg = false;
 }
 
 void CMenu::_setMainBg()
@@ -150,89 +94,15 @@ void CMenu::_showCF(bool refreshList)
 		if(m_gameList.empty())
 		{
 			cacheCovers = false;
-			switch(m_current_view)
-			{
-				case COVERFLOW_WII:
-					Msg = _t("main2", L"No games found in");
-					Pth = sfmt(wii_games_dir, DeviceName[currentPartition]);
-					break;
-				case COVERFLOW_GAMECUBE:
-					Msg = _t("main2", L"No games found in");
-					Pth = sfmt(gc_games_dir, DeviceName[currentPartition]);
-					break;
-				case COVERFLOW_CHANNEL:
-					Msg = _t("main3", L"No titles found in");
-					Pth = sfmt("%s:/%s/%s", DeviceName[currentPartition],  emu_nands_dir, m_cfg.getString(CHANNEL_DOMAIN, "current_emunand").c_str());
-					break;
-				case COVERFLOW_HOMEBREW:
-					Msg = _t("main4", L"No apps found in");
-					Pth = sfmt(HOMEBREW_DIR, DeviceName[currentPartition]);
-					break;
-				case COVERFLOW_PLUGIN:
-					Pth = "";
-					if(enabledPluginsCount == 0)
-						Msg = _t("main6", L"No plugins selected.");
-					else if(enabledPluginsCount > 1)
-						Msg = _t("main5", L"No roms/items found.");
-					else
-					{
-						Msg = _t("main2", L"No games found in");
-						u8 i = 0;
-						while(m_plugin.PluginExist(i) && !m_plugin.GetEnabledStatus(i)){ ++i; }
-						int romsPartition = m_plugin.GetRomPartition(i);
-						if(romsPartition < 0)
-							romsPartition = m_cfg.getInt(PLUGIN_DOMAIN, "partition", 0);
-						const char *romDir = m_plugin.GetRomDir(i);
-						if(strstr(romDir, "scummvm.ini") != NULL && strchr(romDir, ':') != NULL)
-							Pth = sfmt("%s", romDir);
-						else
-							Pth = sfmt("%s:/%s", DeviceName[romsPartition], m_plugin.GetRomDir(i));
-					}
-					break;
-			}
+			Msg = _t("main2", L"No games found in");
+			Pth = sfmt("%s and %s", sfmt(wii_games_dir, DeviceName[currentPartition]).c_str(),
+				sfmt(gc_games_dir, DeviceName[currentPartition]).c_str());
 			Msg.append(wstringEx(' ' + Pth));
 			m_btnMgr.setText(m_mainLblMessage, Msg);
 			m_btnMgr.show(m_mainLblMessage);
 			return;
 		}
 		
-		/* if source menu button set to autoboot */
-		if(m_source_autoboot == true)
-		{	/* search game list for the requested title */
-			bool game_found = false;
-			for(vector<dir_discHdr>::iterator element = m_gameList.begin(); element != m_gameList.end(); ++element)
-			{
-				switch(m_autoboot_hdr.type)
-				{
-					case TYPE_CHANNEL:
-					case TYPE_WII_GAME:
-					case TYPE_GC_GAME:
-						if(strcmp(m_autoboot_hdr.id, element->id) == 0)
-							game_found = true;
-						break;
-					case TYPE_HOMEBREW:
-					case TYPE_PLUGIN:
-						if(wcsncmp(m_autoboot_hdr.title, element->title, 63) == 0)
-							game_found = true;
-						break;
-					default:
-						break;
-				}
-				if(game_found == true)
-				{
-					memcpy(&m_autoboot_hdr, &(*(element)), sizeof(dir_discHdr));
-					break;
-				}
-			}
-			/* title found - launch it */
-			if(game_found == true) 
-			{
-				gprintf("Game found, autobooting...\n");
-				_launch(&m_autoboot_hdr);
-			}
-			/* fail */
-			m_source_autoboot = false;
-		}
 		/* Kids UI: the coverflow only ever draws .wfc cache files, so cover art
 		   copied onto the SD card by hand stays invisible until it is converted.
 		   There is no settings UI left to trigger that, so detect it here: if any
@@ -280,22 +150,12 @@ void CMenu::_showCF(bool refreshList)
 				}while(!m_exit && pause > 0);
 			}
 		}
-		/* setup categories and favorites for filtering the game list below */
-		if(m_clearCats)// false on boot up and if a source menu button selects a category
+		if(m_clearCats)
 		{
-			if(m_autoboot_hdr.type == TYPE_PLUGIN && m_cat.hasDomain("PLUGINS"))
-			{
-				m_cat.remove("PLUGINS", "selected_categories");
-				m_cat.remove("PLUGINS", "required_categories");
-			}
-			else
-			{
-				// do not clear hidden categories to keep games hidden
-				m_cat.remove("GENERAL", "selected_categories");
-				m_cat.remove("GENERAL", "required_categories");
-			}
+			m_cat.remove("GENERAL", "selected_categories");
+			m_cat.remove("GENERAL", "required_categories");
 		}
-		m_clearCats = true;// set to true for next source
+		m_clearCats = true;
 		
 		/* Kids UI: the favorites toggle is stripped from the UI, so favorites
 		   filtering is forced off. A stale favorites=1 in the config would
@@ -307,41 +167,6 @@ void CMenu::_showCF(bool refreshList)
 	}
 	
 	strcpy(cf_domain, "_COVERFLOW");
-	if(!m_sourceflow && m_current_view == COVERFLOW_HOMEBREW && m_cfg.getBool(HOMEBREW_DOMAIN, "smallbox", true))
-		strcpy(cf_domain, "_SMALLFLOW");
-	if(m_sourceflow && m_cfg.getBool(SOURCEFLOW_DOMAIN, "smallbox", true))
-		strcpy(cf_domain, "_SMALLFLOW");
-	if(m_current_view == COVERFLOW_PLUGIN && !m_sourceflow)
-	{
-		/* check if homebrew plugin */
-		if(enabledPluginsCount == 1 && m_plugin.GetEnabledStatus(HB_PMAGIC) && m_cfg.getBool(HOMEBREW_DOMAIN, "smallbox"))
-			strcpy(cf_domain, "_SMALLFLOW");
-		else if(enabledPluginsCount > 0 && m_platform.loaded())
-		{
-			/* get first plugin flow domain */
-			u8 i = 0;
-			while(m_plugin.PluginExist(i) && !m_plugin.GetEnabledStatus(i)){ ++i; }
-			string flow_domain = m_platform.getString("FLOWS", m_platform.getString("PLUGINS", sfmt("%08x", m_plugin.GetPluginMagic(i)), ""), "_COVERFLOW");
-			
-			/* check if all plugin flow domains match */
-			bool match = true;
-			i++;
-			while(m_plugin.PluginExist(i))
-			{
-				if(m_plugin.GetEnabledStatus(i) &&
-					flow_domain != m_platform.getString("FLOWS", m_platform.getString("PLUGINS", sfmt("%08x", m_plugin.GetPluginMagic(i)), ""), "_COVERFLOW"))
-				{
-					match = false;
-					break;
-				}
-				i++;
-			}
-
-			/* if all match we use that flow domain */
-			if(match)
-				snprintf(cf_domain, sizeof(cf_domain), "%s", flow_domain.c_str());
-		}
-	}
 
 	/* get the number of layouts (modes) for the CoverFlow domain */
 	m_numCFVersions = min(max(1, m_coverflow.getInt(cf_domain, "number_of_modes", 1)), 15);// max layouts is 15
@@ -356,10 +181,6 @@ void CMenu::_showCF(bool refreshList)
 	CoverFlow.applySettings();
 
 	gprintf("Displaying covers\n");
-
-	/* display game count if not sourceflow or homebrew */
-	if(m_sourceflow || m_current_view == COVERFLOW_HOMEBREW)
-		return;
 
 	_showTotalGames(CoverFlow.size());
 }
@@ -550,32 +371,18 @@ int CMenu::main(void)
 				MusicPlayer.Next();
 			}
 			/* b+plus = change sort mode */
-			else if(!CoverFlow.empty() && BTN_PLUS_PRESSED && !m_locked && (m_current_view < COVERFLOW_HOMEBREW || m_sourceflow))// homebrew not allowed
+			else if(!CoverFlow.empty() && BTN_PLUS_PRESSED && !m_locked)
 			{
 				const char *domain = _domainFromView();
 				u8 sort = 0;
-				if(m_sourceflow)// change sourceflow sort mode
+				while(true)
 				{
-					sort = m_cfg.getInt(SOURCEFLOW_DOMAIN, "sort", SORT_ALPHA);
-					if(sort == SORT_ALPHA)
-						sort = SORT_BTN_NUMBERS;
-					else
-						sort = SORT_ALPHA;
-					m_cfg.setInt(SOURCEFLOW_DOMAIN, "sort", sort);
-				}
-				else // change all other coverflow sort mode
-				{
-					while(true)
-					{
-						sort = loopNum((m_cfg.getInt(domain, "sort", 0)) + 1, SORT_MAX);
-						m_cfg.setInt(domain, "sort", sort);
-						if(sort == SORT_GAMEID && m_current_view & COVERFLOW_CHANNEL)
-							break;
-						if(sort == SORT_WIFIPLAYERS && (m_current_view & COVERFLOW_WII || m_current_view & COVERFLOW_CHANNEL))
-							break;
-						if(sort != SORT_GAMEID && sort != SORT_WIFIPLAYERS)
-							break;
-					}
+					sort = loopNum((m_cfg.getInt(domain, "sort", 0)) + 1, SORT_MAX);
+					m_cfg.setInt(domain, "sort", sort);
+					if(sort == SORT_WIFIPLAYERS && (m_current_view & COVERFLOW_WII))
+						break;
+					if(sort != SORT_GAMEID && sort != SORT_WIFIPLAYERS)
+						break;
 				}
 				
 				/* set coverflow to new sorting */
@@ -887,58 +694,10 @@ void CMenu::exitHandler(int ExitTo)
 
 int CMenu::_getCFVersion()
 {
-	if(m_current_view == COVERFLOW_PLUGIN)
-	{
-		int first = 0;
-		for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-		{
-			if(m_plugin.GetEnabledStatus(i))
-			{
-				string magic = sfmt("%08x", m_plugin.GetPluginMagic(i));
-				if(m_cfg.has("PLUGIN_CFVERSION", magic))
-				{
-					if(first > 0 && m_cfg.getInt("PLUGIN_CFVERSION", magic, 1) != first)
-						return m_cfg.getInt(_domainFromView(), "last_cf_mode", 1);
-					else if(first == 0)	
-						first = m_cfg.getInt("PLUGIN_CFVERSION", magic, 1);
-				}
-			}
-		}
-		if(first == 0)
-			first++;
-		return first;
-	}
 	return m_cfg.getInt(_domainFromView(), "last_cf_mode", 1);
 }
 
 void CMenu::_setCFVersion(int version)
 {
-	if(m_current_view == COVERFLOW_PLUGIN)
-	{
-		int first = 0;
-		for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-		{
-			if(m_plugin.GetEnabledStatus(i))
-			{
-				string magic = sfmt("%08x", m_plugin.GetPluginMagic(i));
-				if(m_cfg.has("PLUGIN_CFVERSION", magic))
-				{
-					if(first > 0 && m_cfg.getInt("PLUGIN_CFVERSION", magic, 1) != first)
-					{
-						m_cfg.setInt(_domainFromView(), "last_cf_mode", version);
-						return;
-					}
-					else if(first == 0)	
-						first = m_cfg.getInt("PLUGIN_CFVERSION", magic, 1);
-				}
-			}
-		}
-		for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-		{
-			if(m_plugin.GetEnabledStatus(i))
-				m_cfg.setInt("PLUGIN_CFVERSION", sfmt("%08x", m_plugin.GetPluginMagic(i)), version);
-		}
-	}
-	else
-		m_cfg.setInt(_domainFromView(), "last_cf_mode", version);
+	m_cfg.setInt(_domainFromView(), "last_cf_mode", version);
 }

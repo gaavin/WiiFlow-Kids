@@ -36,7 +36,6 @@ SOURCES		:=	source \
 				source/menu \
 				source/music \
 				source/network \
-				source/plugin \
 				source/sicksaxis-wrapper \
 				source/unzip \
 				source/wstringEx

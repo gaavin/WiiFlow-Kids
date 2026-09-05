@@ -34,7 +34,6 @@
 #include "memory/mem2.hpp"
 //#include "network/FTP_Dir.hpp"
 #include "network/https.h"
-#include "plugin/crc32.h"
 
 /* External WiiFlow Game Booter */
 the_CFG normalCFG;

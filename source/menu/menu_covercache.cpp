@@ -32,16 +32,7 @@ int CMenu::_cacheCovers()
 	m_thrdTotal = total;
 	u32 index = 0;
 	
-	bool smallBox = false;
-	if(m_current_view == COVERFLOW_HOMEBREW && !m_sourceflow)
-		smallBox = m_cfg.getBool(HOMEBREW_DOMAIN, "smallbox", false);
-	else if(m_sourceflow)
-		smallBox = m_cfg.getBool(SOURCEFLOW_DOMAIN, "smallbox", false);
-	else if(m_current_view == COVERFLOW_PLUGIN && !m_sourceflow)
-	{
-		if(enabledPluginsCount == 1 && m_plugin.GetEnabledStatus(HB_PMAGIC))
-			smallBox = m_cfg.getBool(HOMEBREW_DOMAIN, "smallbox", false);
-	}
+	const bool smallBox = false;
 
 	for(vector<dir_discHdr>::iterator hdr = m_gameList.begin(); hdr != m_gameList.end(); ++hdr)
 	{
@@ -52,23 +43,14 @@ int CMenu::_cacheCovers()
 		
 		_cacheCover(&(*hdr), smallBox);
 		
-		/* cache wii and channel banners */
-		if(hdr->type == TYPE_WII_GAME || hdr->type == TYPE_CHANNEL || hdr->type == TYPE_EMUCHANNEL)
+		if(hdr->type == TYPE_WII_GAME)
 		{
 			CurrentBanner.ClearBanner();
 			char cached_banner[256];
 			strlcpy(cached_banner, fmt("%s/%s.bnr", m_bnrCacheDir.c_str(), hdr->id), sizeof(cached_banner));
 			if(fsop_FileExist(cached_banner))
 				continue;
-			if(hdr->type == TYPE_WII_GAME)
-			{
-				_extractBnr(&(*hdr));
-			}
-			else if(hdr->type == TYPE_CHANNEL || hdr->type == TYPE_EMUCHANNEL)
-			{
-				ChannelHandle.GetBanner(TITLE_ID(hdr->settings[0], hdr->settings[1]));
-			}
-			
+			_extractBnr(&(*hdr));
 			if(CurrentBanner.IsValid())
 				fsop_WriteFile(cached_banner, CurrentBanner.GetBannerFile(), CurrentBanner.GetBannerFileSize());
 		}
@@ -115,15 +97,7 @@ int CMenu::_cacheCover(const dir_discHdr *hdr, bool smallBox)// fix hdr
 		}
 	}
 	
-	/* get cache folder path */
-	if(hdr->type == TYPE_PLUGIN)
-		snprintf(cachePath, sizeof(cachePath), "%s/%s", m_cacheDir.c_str(), m_plugin.GetCoverFolderName(hdr->settings[0]));
-	else if(m_sourceflow)
-		snprintf(cachePath, sizeof(cachePath), "%s/sourceflow", m_cacheDir.c_str());
-	else if(hdr->type == TYPE_HOMEBREW)
-		snprintf(cachePath, sizeof(cachePath), "%s/homebrew", m_cacheDir.c_str());
-	else
-		snprintf(cachePath, sizeof(cachePath), "%s", m_cacheDir.c_str());
+	snprintf(cachePath, sizeof(cachePath), "%s", m_cacheDir.c_str());
 	gprintf("cachepath=%s\n", cachePath);
 
 	/* get game name or ID */

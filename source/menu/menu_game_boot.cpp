@@ -76,12 +76,9 @@ static u8 GetRequestedGameIOS(dir_discHdr *hdr)
 void CMenu::directlaunch(const char *GameID)// from boot arg for wii game only
 {
 	m_directLaunch = true;
-	u8 chantypes = m_cfg.getUInt(CHANNEL_DOMAIN, "channels_type", CHANNELS_REAL);
-	m_cfg.setUInt(CHANNEL_DOMAIN, "channels_type", CHANNELS_EMU);
-	m_current_view = COVERFLOW_WII | COVERFLOW_GAMECUBE | COVERFLOW_CHANNEL;
+	m_current_view = KIDS_VIEW;
 	_loadList();
-	m_cfg.setUInt(CHANNEL_DOMAIN, "channels_type", chantypes);
-	
+
 	for(u32 i = 0; i < m_gameList.size(); i++)
 	{
 		if(strncasecmp(GameID, m_gameList[i].id, 6) == 0)
@@ -90,7 +87,7 @@ void CMenu::directlaunch(const char *GameID)// from boot arg for wii game only
 			break;
 		}
 	}
-	
+
 	_error(wfmt(_fmt("errgame1", L"Cannot find the game with ID: %s"), GameID));
 }
 
@@ -112,42 +109,14 @@ void CMenu::_launch(const dir_discHdr *hdr)
 	m_cfg.setInt("GENERAL", "cat_startpage", m_catStartPage);
 	m_gcfg2.load(fmt("%s/" GAME_SETTINGS2_FILENAME, m_settingsDir.c_str()));
 
-	/* change to current game's partition */
-	switch(launchHdr.type)
-	{
-		case TYPE_CHANNEL:
-		case TYPE_EMUCHANNEL:
-			currentPartition = m_cfg.getInt(CHANNEL_DOMAIN, "partition", 1);
-			break;
-		case TYPE_HOMEBREW:
-			currentPartition = m_cfg.getInt(HOMEBREW_DOMAIN, "partition", 1);
-			break;
-		case TYPE_GC_GAME:
-			currentPartition = m_cfg.getInt(GC_DOMAIN, "partition", 1);
-			break;
-		case TYPE_WII_GAME:
-			currentPartition = m_cfg.getInt(WII_DOMAIN, "partition", 1);
-			break;
-		default:
-			int romsPartition = m_plugin.GetRomPartition(m_plugin.GetPluginPosition(launchHdr.settings[0]));
-			if(romsPartition < 0)
-				romsPartition = m_cfg.getInt(PLUGIN_DOMAIN, "partition", 0);
-			currentPartition = romsPartition;
-			break;
-	}
+	currentPartition = (launchHdr.type == TYPE_GC_GAME)
+		? m_cfg.getInt(GC_DOMAIN, "partition", 1)
+		: m_cfg.getInt(WII_DOMAIN, "partition", 1);
 
-	/* Get Banner Title for Playlog */
-	if(launchHdr.type == TYPE_WII_GAME || launchHdr.type == TYPE_CHANNEL || launchHdr.type == TYPE_EMUCHANNEL)
+	if(launchHdr.type == TYPE_WII_GAME)
 	{
-		NANDemuView = launchHdr.type == TYPE_EMUCHANNEL;
 		CurrentBanner.ClearBanner();
-		if(launchHdr.type == TYPE_CHANNEL || launchHdr.type == TYPE_EMUCHANNEL)
-		{
-			u64 chantitle = TITLE_ID(launchHdr.settings[0],launchHdr.settings[1]);
-			ChannelHandle.GetBanner(chantitle);
-		}
-		else if(launchHdr.type == TYPE_WII_GAME)
-			_extractBnr(&launchHdr);
+		_extractBnr(&launchHdr);
 		u8 banner_title[84];
 		memset(banner_title, 0, 84);
 		if(CurrentBanner.IsValid())
@@ -158,122 +127,16 @@ void CMenu::_launch(const dir_discHdr *hdr)
 	}
 
 	gprintf("Launching game %s\n", launchHdr.id);
-	if(launchHdr.type == TYPE_EMUCHANNEL)
-		gprintf("from emu nand\n");
-	else if(launchHdr.type == TYPE_CHANNEL)
-		gprintf("from real nand\n");
 
-	/* Lets boot that shit */
 	if(launchHdr.type == TYPE_WII_GAME)
 		_launchWii(&launchHdr, false);
 	else if(launchHdr.type == TYPE_GC_GAME)
 		_launchGC(&launchHdr, false);
-	else if(launchHdr.type == TYPE_CHANNEL || launchHdr.type == TYPE_EMUCHANNEL)
-		_launchChannel(&launchHdr);
-	else if(launchHdr.type == TYPE_PLUGIN)
-		_launchPlugin(&launchHdr);
-	else if(launchHdr.type == TYPE_HOMEBREW)
-	{
-		const char *bootpath = fmt("%s/boot.dol", launchHdr.path);
-		if(!fsop_FileExist(bootpath))
-			bootpath = fmt("%s/boot.elf", launchHdr.path);
-		if(fsop_FileExist(bootpath))
-		{
-			m_cfg.setString(HOMEBREW_DOMAIN, "current_item", strrchr(launchHdr.path, '/') + 1);
-			vector<string> arguments = _getMetaXML(bootpath);
-			gprintf("launching homebrew app\n");
-			_launchHomebrew(bootpath, arguments);
-		}
-	}
 	// if we make it here it means the launch failed.
 	//Exit WiiFlow, no game booted...
 	cleanup();// cleanup and clear memory
 	ShutdownBeforeExit();// unmount devices and close inputs. launch game failed.
 	Sys_Exit();
-}
-
-void CMenu::_launchPlugin(dir_discHdr *hdr)
-{
-	if(strcmp(hdr->id, "PLUGIN") != 0)
-	{
-		strncpy(m_plugin.PluginMagicWord, fmt("%08x", hdr->settings[0]), 8);
-		string gcfg1Key = sfmt("%s/%s", m_platform.getString("PLUGINS", m_plugin.PluginMagicWord).c_str(), hdr->id);
-		m_gcfg1.setInt("PLAYCOUNT_PLUGINS", gcfg1Key, m_gcfg1.getInt("PLAYCOUNT_PLUGINS", gcfg1Key, 0) + 1);
-		m_gcfg1.setUInt("LASTPLAYED_PLUGINS", gcfg1Key, time(NULL));
-	}
-
-	/* get dol name and name length for music plugin */
-	const char *plugin_dol_name = m_plugin.GetDolName(hdr->settings[0]);
-	u8 plugin_dol_len = strlen(plugin_dol_name);
-	
-	/* check if music player plugin, if so set wiiflow's bckgrnd music player to play this song or playlist */
-	if(plugin_dol_len == 5 && strcasecmp(plugin_dol_name, "music") == 0)
-	{
-		if(strstr(hdr->path, ".pls") == NULL && strstr(hdr->path, ".m3u") == NULL)
-			MusicPlayer.LoadFile(hdr->path, false);
-		else
-		{
-			m_music_info = m_cfg.getBool("GENERAL", "display_music_info", false);
-			MusicPlayer.InitPlaylist(m_cfg, hdr->path, currentPartition);// maybe error msg if trouble loading playlist
-		}
-		return;
-	}
-	
-	/* get title from hdr */
-	u32 title_len_no_ext = 0;
-	const char *title = CoverFlow.getFilenameId(hdr);// with extension
-	
-	/* get path from hdr */
-	// example rom path - dev:/roms/super mario bros.zip
-	// example scummvm path - kq1-coco3		
-	const char *path = NULL;
-	if(strchr(hdr->path, ':') != NULL)//it's a rom path
-	{
-		// if there's extension get length of title without extension
-		if(strchr(hdr->path, '.') != NULL)
-			title_len_no_ext = strlen(title) - strlen(strrchr(title, '.'));
-		// get path
-		*strrchr(hdr->path, '/') = '\0'; //cut title off end of path
-		path = strchr(hdr->path, '/') + 1; //cut dev:/ off of path
-	}
-	else // it's a scummvm game
-		path = hdr->path;// kq1-coco3
-
-	/* get device */
-	const char *device = (currentPartition == 0 ? "sd" : (DeviceHandle.GetFSType(currentPartition) == PART_FS_NTFS ? "ntfs" : "usb"));
-	
-	/* get loader */
-	// the loader arg was used and added to plugin mods that fix94 made.
-	// it was used because postloader 4 also used the wiiflow plugins and the emus needed to know which loader to return to.
-	// the wiimednafen plugin mod still requires this loader arg. most others don't use it.
-	const char *loader = fmt("%s:/%s/WiiFlowLoader.dol", device, strchr(m_pluginsDir.c_str(), '/') + 1);
-
-	/* set arguments */
-	vector<string> arguments = m_plugin.CreateArgs(device, path, title, loader, title_len_no_ext, hdr->settings[0]);
-	
-	/* find plugin dol - it does not have to be in dev:/wiiflow/plugins */
-	const char *plugin_file = plugin_dol_name; // try full path
-	if(strchr(plugin_file, ':') == NULL || !fsop_FileExist(plugin_file)) // if not found try wiiflow plugin folder
-	{
-		plugin_file = fmt("%s/%s", m_pluginsDir.c_str(), plugin_dol_name);
-		if(!fsop_FileExist(plugin_file)) // not found - try device search
-		{
-			for(u8 i = SD; i < MAXDEVICES; ++i)
-			{
-				plugin_file = fmt("%s:/%s", DeviceName[i], plugin_dol_name);
-				if(fsop_FileExist(plugin_file))
-					break;
-			}
-		}
-	}
-	
-	/* date fixes for specific plugins */
-	if(hdr->settings[0] == 1414875969) //wiituka
-		settime(637962048000000000);// Aug 16, 2022
-	
-	/* launch plugin with args */
-	gprintf("launching plugin app\n");
-	_launchHomebrew(plugin_file, arguments);
 }
 
 void CMenu::_launchHomebrew(const char *filepath, vector<string> arguments)
@@ -802,219 +665,6 @@ int CMenu::_loadGameIOS(u8 gameIOS, int userIOS, const char *id, bool RealNAND_C
 		return LOAD_IOS_SUCCEEDED;
 	}
 	return LOAD_IOS_NOT_NEEDED;
-}
-
-void CMenu::_launchChannel(dir_discHdr *hdr)
-{
-	/* clear coverflow, start wiiflow wait animation, set exit handler */	
-	_launchShutdown();
-
-	NANDemuView = hdr->type == TYPE_EMUCHANNEL;
-	string id = string(hdr->id);
-	u64 gameTitle = TITLE_ID(hdr->settings[0],hdr->settings[1]);
-	m_gcfg1.setInt("PLAYCOUNT", id, m_gcfg1.getInt("PLAYCOUNT", id, 0) + 1); 
-	m_gcfg1.setUInt("LASTPLAYED", id, time(NULL));
-
-	bool hbc = false;
-	if(gameTitle == HBC_OHBC || gameTitle == HBC_LULZ || gameTitle == HBC_108 || gameTitle == HBC_JODI || gameTitle == HBC_HAXX)
-		hbc = true;
-		
-	/* WII_Launch is used only for launching real nand channels */
-	/* note: no patches, cheats, or cIOS settings allowed */
-	bool WII_Launch = (m_gcfg2.getBool(id, "custom", false) && !NANDemuView);
-	if(WII_Launch || (hbc && !NANDemuView))
-	{
-		/* configs no longer needed */
-		m_gcfg1.save(true);
-		m_gcfg2.save(true);
-		m_cat.save(true);
-		m_cfg.save(true);
-		cleanup();//no more error messages we can now cleanup
-		ShutdownBeforeExit();// before wii_launch channel
-		WII_Initialize();
-		WII_LaunchTitle(gameTitle);
-	}
-		
-	/* use_dol = true to use the channels dol or false to use the old apploader method to boot channel */
-	bool use_dol = !m_gcfg2.getBool(id, "apploader", false);
-	bool use_led = m_gcfg2.getBool(id, "led", false);
-
-	int language = min(m_gcfg2.getUInt(id, "language", 0), ARRAY_SIZE(CMenu::_languages) - 1u);
-	language = (language == 0) ? min(m_cfg.getUInt("GENERAL", "game_language", 0), ARRAY_SIZE(CMenu::_languages) - 1u) : language;
-
-	bool vipatch = m_gcfg2.getBool(id, "vipatch", false);
-	bool countryPatch = m_gcfg2.getBool(id, "country_patch", false);
-
-	u8 videoMode = min(m_gcfg2.getUInt(id, "video_mode", 0), ARRAY_SIZE(CMenu::_VideoModes) - 1u);
-	videoMode = (videoMode == 0) ? min(m_cfg.getUInt("GENERAL", "video_mode", 0), ARRAY_SIZE(CMenu::_GlobalVideoModes) - 1u) : videoMode - 1;
-	
-	u8 patchVidMode = min(m_gcfg2.getUInt(id, "patch_video_modes", 0), ARRAY_SIZE(CMenu::_vidModePatch) - 1u);
-
-	s8 aspectRatio = min(m_gcfg2.getUInt(id, "aspect_ratio", 0), ARRAY_SIZE(CMenu::_AspectRatio) - 1) - 1;// -1,0,1
-
-	int fix480pVal = m_gcfg2.getOptBool(id, "fix480p", 2);
-	bool fix480p = fix480pVal == 0 ? false : (fix480pVal == 1 ? true : m_cfg.getBool(WII_DOMAIN, "fix480p", false));
-
-	u8 wiiuWidescreen = min(m_gcfg2.getUInt(id, "widescreen_wiiu", 0), ARRAY_SIZE(CMenu::_WidescreenWiiu) - 1u);
-
-	u8 deflicker = min(m_gcfg2.getUInt(id, "deflicker_wii", 0), ARRAY_SIZE(CMenu::_DeflickerOptions) - 1u);
-	deflicker = (deflicker == 0) ? min(m_cfg.getUInt("GENERAL", "deflicker_wii", 0), ARRAY_SIZE(CMenu::_GlobalDeflickerOptions) - 1u) : deflicker - 1;
-	
-	u8 videoWidth = min(m_gcfg2.getUInt(id, "video_width", 0), ARRAY_SIZE(CMenu::_VideoWidths) - 1u);
-	videoWidth = (videoWidth == 0) ? min(m_cfg.getUInt("GENERAL", "video_width", 0), ARRAY_SIZE(CMenu::_GlobalVideoWidths) - 1u) : videoWidth-1;
-
-	u8 private_server = m_gcfg2.getUInt(id, "private_server", 0);
-	string server_addr = "";
-	if(private_server > 2)
-	{
-		vector<string> custom_servers = stringToVector(m_cfg.getString("custom_servers", "servers"), '|');
-		server_addr = m_cfg.getString("custom_servers", fmt("%s_url", custom_servers[private_server - 3]), "");
-	}
-
-	u32 returnTo = 0;
-	const char *rtrn = m_cfg.getString("GENERAL", "returnto").c_str();
-	if(strlen(rtrn) == 4)
-		returnTo = rtrn[0] << 24 | rtrn[1] << 16 | rtrn[2] << 8 | rtrn[3];
-
-	/* get debugger selected - 0(off), 1(gecko), 2(OSReport) */
-	/* gecko requires a hooktype */
-	/* Operating System (OS) Report patches every fwrite() in main dol to send debug info. no hooktype is needed. */
-	/* 2(OSReport) fwrite() patch is not patched for channels. not sure if it can be */
-	debuggerselect = m_gcfg2.getInt(id, "debugger", 0);
-
-	bool cheat = m_gcfg2.getBool(id, "cheat", false);
-	hooktype = (u32) m_gcfg2.getInt(id, "hooktype", 0);
-	if((cheat || debuggerselect == 1) && hooktype == 0)// cheats or gecko debugger enabled, set hooktype (0)auto to (1)vbi
-		hooktype = 1;
-	else if(!cheat && debuggerselect != 1)
-		hooktype = 0;
-	
-	u8 *cheatFile = NULL;
-	u32 cheatSize = 0;
-	if(cheat)
-		_loadFile(cheatFile, cheatSize, m_cheatDir.c_str(), fmt("%s.gct", id.c_str()));
-		
-	/* note: no .wip or gameconfig.txt support for channels. not sure why */
-
-	if(has_enabled_providers() && _initNetwork() == 0)
-		add_game_to_card(id.c_str());
-
-	int userIOS = m_gcfg2.getInt(id, "ios", 0);
-	u32 gameIOS = ChannelHandle.GetRequestedIOS(gameTitle);
-	
-	//interesting - there is only a global option for nand emulation - no per game choice
-	int emulate_mode = min(max(0, m_cfg.getInt(CHANNEL_DOMAIN, "emulation", 1)), (int)ARRAY_SIZE(CMenu::_NandEmu) - 1);
-	
-	bool useNK2o = m_gcfg2.getBool(id, "useneek", false);//if not in neek2o and use neek is set
-
-	if(NANDemuView)
-	{
-		/* copy real NAND sysconf, settings.txt, & RFL_DB.dat if you want to, they are replaced if they already exist */
-		NandHandle.PreNandCfg(m_cfg.getBool(CHANNEL_DOMAIN, "real_nand_miis", false), 
-								m_cfg.getBool(CHANNEL_DOMAIN, "real_nand_config", false));
-		//m_cfg.setBool(CHANNEL_DOMAIN, "real_nand_miis", false); 
-		//m_cfg.setBool(CHANNEL_DOMAIN, "real_nand_config", false);
-	}
-
-	/* configs no longer needed */
-	m_gcfg1.save(true);
-	m_gcfg2.save(true);
-	m_cat.save(true);
-	m_cfg.save(true);
-
-	/* launch via neek2o */
-	if(NANDemuView)
-	{
-		if(useNK2o)
-		{
-			if(!Load_Neek2o_Kernel())
-			{
-				_error(_t("errneek1", L"Cannot launch neek2o. Verify your neek2o setup"));//kernal.bin not found
-				return;
-			}
-			else 
-			{
-				const char *nkrtrn = NULL;
-				if(IsOnWiiU())
-					nkrtrn = "HCVA";// Return to WiiU system channel
-				else
-					nkrtrn = "NK2O";
-				u32 nkreturnTo = nkrtrn[0] << 24 | nkrtrn[1] << 16 | nkrtrn[2] << 8 | nkrtrn[3];
-				cleanup();
-				ShutdownBeforeExit();// before using neek2o to launch a channel
-				if(IsOnWiiU())
-					Launch_nk(gameTitle, NandHandle.Get_NandPath(), ((u64)(0x00010002) << 32) | (nkreturnTo & 0xFFFFFFFF));
-				else
-					Launch_nk(gameTitle, NandHandle.Get_NandPath(), ((u64)(0x00010001) << 32) | (nkreturnTo & 0xFFFFFFFF));
-				while(1) usleep(500);
-			}
-		}
-	}
-
-	/* load external booter bins */
-	if(ExternalBooter_LoadBins(m_binsDir.c_str()) == false)
-	{
-		_error(_t("errgame16", L"Missing ext_loader.bin or ext_booter.bin!"));
-		return;
-	}
-
-	/* load selected cIOS if necessary */
-	if(_loadGameIOS(gameIOS, userIOS, id.c_str(), !NANDemuView) == LOAD_IOS_FAILED)
-	{
-		/* error message already shown */
-		return;
-	}
-
-	/* if d2x cios patch returnto */
-	if(CurrentIOS.Type == IOS_TYPE_D2X && returnTo != 0)
-	{
-		if(D2X_PatchReturnTo(returnTo) >= 0)
-			memset(&returnTo, 0, sizeof(u32));//Already patched - no need for giantpune patch in external booter
-	}
-
-
-	// nand emulation not available with hermes cios
-	// waninkoko cios rev14 started nand emulation (must be on root of device)
-	// waninkoko cios rev18 added full nand emulation
-	// rev21 and d2x cios added path support
-	if(NANDemuView)
-	{
-		/* Enable our Emu NAND */
-		DeviceHandle.UnMountAll();
-		if(emulate_mode == 1)
-			NandHandle.Set_FullMode(true);
-		else
-			NandHandle.Set_FullMode(false);
-		if(NandHandle.Enable_Emu() < 0)
-		{
-			NandHandle.Disable_Emu();
-			_error(_t("errgame5", L"Enabling emu failed!"));
-			return;
-		}
-		DeviceHandle.MountAll();
-	}
-	
-	cleanup();//no more error messages we can now cleanup
-	
-	if(wiiuWidescreen > 0 && IsOnWiiU())
-	{
-		write32(0xd8006a0, wiiuWidescreen == 2 ? 0x30000004 : 0x30000002);
-		mask32(0xd8006a8, 0, 2);
-	}
-
-	setLanguage(language);// set configbyte[0] for external booter
-	ocarina_load_code(cheatFile, cheatSize);// copy to address used by external booter
-	if(cheatFile != NULL)
-		MEM2_free(cheatFile);
-	NandHandle.Patch_AHB(); /* Identify maybe uses it so keep AHBPROT disabled */
-	PatchIOS(true,  isWiiVC); /* Patch cIOS for everything */
-	Identify(gameTitle);// identify title with E-Ticket Service (ES) module
-
-	ExternalBooter_ChannelSetup(gameTitle, use_dol);
-	WiiFlow_ExternalBooter(videoMode, vipatch, countryPatch, patchVidMode, aspectRatio, private_server, server_addr.c_str(), 
-							videoWidth, fix480p, deflicker, 0, TYPE_CHANNEL, use_led);
-
-	Sys_Exit();
 }
 
 void CMenu::_launchWii(dir_discHdr *hdr, bool dvd)

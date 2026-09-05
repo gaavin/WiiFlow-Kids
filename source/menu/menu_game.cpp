@@ -39,31 +39,7 @@ void CMenu::_extractBnr(const dir_discHdr *hdr)
 
 void CMenu::_setCurrentItem(const dir_discHdr *hdr)
 {
-	const char *fn_id = CoverFlow.getFilenameId(hdr);
-	if(m_current_view == COVERFLOW_PLUGIN)
-	{
-		if(hdr->type == TYPE_PLUGIN)
-			strncpy(m_plugin.PluginMagicWord, fmt("%08x", hdr->settings[0]), 8);
-		else
-		{
-			if(hdr->type == TYPE_WII_GAME)
-				strncpy(m_plugin.PluginMagicWord, WII_PMAGIC, 9);
-			else if(hdr->type == TYPE_GC_GAME)
-				strncpy(m_plugin.PluginMagicWord, GC_PMAGIC, 9);
-			else if(hdr->type == TYPE_CHANNEL)
-				strncpy(m_plugin.PluginMagicWord, NAND_PMAGIC, 9);
-			else if(hdr->type == TYPE_EMUCHANNEL)
-				strncpy(m_plugin.PluginMagicWord, ENAND_PMAGIC, 9);
-			else //HOMEBREW
-				strncpy(m_plugin.PluginMagicWord, HB_PMAGIC, 9);
-		}
-		m_cfg.setString(PLUGIN_DOMAIN, "cur_magic", m_plugin.PluginMagicWord);
-		m_cfg.setString("plugin_item", m_plugin.PluginMagicWord, fn_id);
-	}
-	else
-	{
-		m_cfg.setString(_domainFromView(), "current_item", fn_id);
-	}
+	m_cfg.setString(_domainFromView(), "current_item", CoverFlow.getFilenameId(hdr));
 }
 
 void CMenu::_hideGame(bool instant)
@@ -91,11 +67,7 @@ void CMenu::_showGame(void)
 	const dir_discHdr *GameHdr = CoverFlow.getHdr();
 	const char *FanartPath = NULL;
 	
-	/* set fanart path */
-	if(GameHdr->type == TYPE_PLUGIN)
-		FanartPath = fmt("%s/%s", m_fanartDir.c_str(), m_plugin.GetCoverFolderName(GameHdr->settings[0]));
-	else
-		FanartPath = fmt("%s", m_fanartDir.c_str());
+	FanartPath = fmt("%s", m_fanartDir.c_str());
 
 	/* Load fanart config if available */
 	if(m_fa.load(m_cfg, FanartPath, GameHdr))
@@ -138,35 +110,12 @@ bool CMenu::_startVideo()
 	const char *videoPath = NULL;
 	const char *THP_Path = NULL;
 	
-	if(GameHdr->type == TYPE_PLUGIN)
+	videoPath = fmt("%s/%s.3", m_videoDir.c_str(), GameHdr->id);
+	THP_Path = fmt("%s.thp", videoPath);
+	if(!fsop_FileExist(THP_Path))
 	{
-		const char *fn = CoverFlow.getFilenameId(GameHdr);//title.ext
-		const char *coverDir = m_plugin.GetCoverFolderName(GameHdr->settings[0]);
-		videoPath = fmt("%s/%s/%s", m_videoDir.c_str(), coverDir, fn);
+		videoPath = fmt("%s/%s", m_videoDir.c_str(), GameHdr->id);
 		THP_Path = fmt("%s.thp", videoPath);
-		if(!fsop_FileExist(THP_Path))
-		{
-			if(strrchr(videoPath, '.') != NULL)
-			{
-				*strrchr(videoPath, '.') = '\0';
-				THP_Path = fmt("%s.thp", videoPath);
-			}
-			if(!fsop_FileExist(THP_Path))//default video for all games of this plugin
-			{
-				videoPath = fmt("%s/%s", m_videoDir.c_str(), m_plugin.PluginMagicWord);// use magic number as the filename
-				THP_Path = fmt("%s.thp", videoPath);
-			}
-		}
-	}
-	else
-	{
-		videoPath = fmt("%s/%s.3", m_videoDir.c_str(), GameHdr->id);// try id3 first
-		THP_Path = fmt("%s.thp", videoPath);	
-		if(!fsop_FileExist(THP_Path))
-		{
-			videoPath = fmt("%s/%s", m_videoDir.c_str(), GameHdr->id);
-			THP_Path = fmt("%s.thp", videoPath);
-		}
 	}
 	if(fsop_FileExist(THP_Path))
 	{
@@ -199,31 +148,9 @@ void CMenu::_game(bool launch)
 	memcpy(hdr, CoverFlow.getHdr(), sizeof(dir_discHdr));
 	_setCurrentItem(hdr);
 	
-	char gcfg1Key[74];
-	char gameTitle[64];
+	char gcfg1Key[16];
 	memset(gcfg1Key, 0, sizeof(gcfg1Key));
-	memset(gameTitle, 0, sizeof(gameTitle));
-	
-	if(hdr->type == TYPE_HOMEBREW)
-		wcstombs(gcfg1Key, hdr->title, 63);// uses title which is the folder name in apps.
-	else if(hdr->type == TYPE_PLUGIN)
-	{
-		strncpy(m_plugin.PluginMagicWord, fmt("%08x", hdr->settings[0]), 8);
-		
-		// if game has an id from the plugin database we use the new method which uses platform name/id
-		if(strcmp(hdr->id, "PLUGIN") != 0 && !m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "").empty())
-			strncpy(gcfg1Key, fmt("%s/%s", m_platform.getString("PLUGINS", m_plugin.PluginMagicWord).c_str(), hdr->id), 73);
-		else // old pre 5.4.4 method which uses plugin magic/title of game
-		{
-			if(strrchr(hdr->path, '/') != NULL)
-				wcstombs(gameTitle, hdr->title, 63);
-			else
-				memcpy(gameTitle, hdr->path, 63);// scummvm
-			strncpy(gcfg1Key, fmt("%s/%s", m_plugin.PluginMagicWord, gameTitle), 73);
-		}
-	}
-	else // wii, gc, channels
-		strcpy(gcfg1Key, hdr->id);
+	strcpy(gcfg1Key, hdr->id);
 
 	m_zoom_banner = m_cfg.getBool(_domainFromView(), "show_full_banner", false);
 
@@ -637,172 +564,22 @@ void * CMenu::_gameSoundThread(void *obj)
 	
 	const dir_discHdr *GameHdr = CoverFlow.getHdr();
 	
-	if(GameHdr->type == TYPE_PLUGIN)
+	/* try to get custom banner for wii, gc, and channels */
+	/* check custom ID6 first */
+	strncpy(custom_banner, fmt("%s/%s.bnr", m->m_customBnrDir.c_str(), GameHdr->id), 255);
+	fsop_GetFileSizeBytes(custom_banner, &custom_bnr_size);
+	if(custom_bnr_size > 0)
 	{
-		char game_sound[256];
-		game_sound[255] = '\0';
-		char fileNameFull[128];
-		fileNameFull[127] = '\0';
-		char fileName[128];
-		fileName[127] = '\0';
-
-		strncpy(fileNameFull, CoverFlow.getFilenameId(GameHdr), sizeof(fileNameFull) - 1);
-		strcpy(fileName, fileNameFull);
-		if(strrchr(fileName, '.') != NULL)
-			*strrchr(fileName, '.') = '\0';// remove .ext
-		
-		const char *coverDir = m_plugin.GetCoverFolderName(GameHdr->settings[0]);
-
-		strncpy(custom_banner, fmt("%s/%s/%s.bnr", m->m_customBnrDir.c_str(), coverDir, fileNameFull), sizeof(custom_banner) - 1);
-		if(!fsop_FileExist(custom_banner))
-			strncpy(custom_banner, fmt("%s/%s/%s.bnr", m->m_customBnrDir.c_str(), coverDir, fileName), sizeof(custom_banner) - 1);
-
-		strncpy(game_sound, fmt("%s/gamesounds/%s/%s", m->m_dataDir.c_str(), coverDir, fileNameFull), sizeof(game_sound) - 1);
-		if(!fsop_FileExist(game_sound))
-			strncpy(game_sound, fmt("%s/gamesounds/%s/%s", m->m_dataDir.c_str(), coverDir, fileName), sizeof(game_sound) - 1);
-		
-		/* get plugin rom custom banner */
-		fsop_GetFileSizeBytes(custom_banner, &custom_bnr_size);
-		if(custom_bnr_size > 0)
+		custom_bnr_file = (u8*)MEM2_lo_alloc(custom_bnr_size);
+		if(custom_bnr_file != NULL)
 		{
-			custom_bnr_file = (u8*)MEM2_lo_alloc(custom_bnr_size);
-			if(custom_bnr_file != NULL)
-			{
-				fsop_ReadFileLoc(custom_banner, custom_bnr_size, (void*)custom_bnr_file);
-				m_banner_loaded = true;
-			}
-		}
-		/* if no banner try getting snap shot */
-		if((custom_bnr_size == 0 || custom_bnr_file == NULL) && m->m_platform.loaded())
-		{
-			//gprintf("trying to get snapshot\n");
-			m_banner.DeleteBanner();
-			char GameID[7];
-			char platformName[16];
-			const char *TMP_Char = NULL;
-			GameTDB gametdb;
-			
-			strncpy(m_plugin.PluginMagicWord, fmt("%08x", GameHdr->settings[0]), 8);
-			snprintf(platformName, sizeof(platformName), "%s", m->m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "").c_str());
-			strcpy(GameID, GameHdr->id);// GameHdr->id is null terminated
-			
-			if(strlen(platformName) != 0 && strcasecmp(GameID, "PLUGIN") != 0)
-			{	
-				string newName = m->m_platform.getString("COMBINED", platformName);
-				if(newName.empty())
-					m->m_platform.remove("COMBINED", platformName);
-				else
-					snprintf(platformName, sizeof(platformName), "%s", newName.c_str());
-
-				/* Load platform name.xml database to get game's info using the gameID */
-				gametdb.OpenFile(fmt("%s/%s/%s.xml", m->m_pluginDataDir.c_str(), platformName, platformName));
-				if(gametdb.IsLoaded())
-				{
-					gametdb.SetLanguageCode(m->m_loc.getString(m->m_curLanguage, "gametdb_code", "EN").c_str());
-			
-					/* Get roms's title without the extra ()'s or []'s */
-					string ShortName;
-					if(strrchr(GameHdr->path, '/') != NULL)
-						ShortName = m_plugin.GetRomName(GameHdr->path);
-					else
-					{
-						char title[64];
-						title[63] = '\0';
-						wcstombs(title, GameHdr->title, sizeof(title) - 1);
-						ShortName = title;
-					}
-
-					const char *snap_path = NULL;
-					if(strcasestr(platformName, "ARCADE") || strcasestr(platformName, "CPS") || !strncasecmp(platformName, "NEOGEO", 6))
-						snap_path = fmt("%s/%s/%s.png", m->m_snapDir.c_str(), platformName, ShortName.c_str());
-					else if(gametdb.GetName(GameID, TMP_Char))
-						snap_path = fmt("%s/%s/%s.png", m->m_snapDir.c_str(), platformName, TMP_Char);
-					
-					gametdb.CloseFile();
-					if(snap_path == NULL || !fsop_FileExist(snap_path))
-						snap_path = fmt("%s/%s/%s.png", m->m_snapDir.c_str(), platformName, GameID);
-
-					if(fsop_FileExist(snap_path))
-					{
-						m->m_snapshot_loaded = true;
-						TexHandle.fromImageFile(m->m_game_snap, snap_path);
-						/* get snapshot position and dimensions to center it on the snap background */
-						int snap_w = m->m_game_snap.width;
-						int snap_h = m->m_game_snap.height;
-						int width_over = snap_w - m->snapbg_w;
-						int height_over = snap_h - m->snapbg_h;
-						float aspect_ratio = (float)snap_w / (float)snap_h;
-						if(width_over > 0 || height_over > 0)
-						{
-							if(width_over > height_over)
-							{
-								snap_w = m->snapbg_w;
-								snap_h = (int)((float)snap_w / aspect_ratio);
-							}
-							else
-							{
-								snap_h = m->snapbg_h;
-								snap_w = (int)((float)snap_h * aspect_ratio);
-							}
-						}
-
-						int x_pos = (m->snapbg_w - snap_w) / 2 + m->snapbg_x;
-						int y_pos = (m->snapbg_h - snap_h) / 2 + m->snapbg_y;
-						m_btnMgr.setTexture(m->m_gameLblSnap, m->m_game_snap, x_pos, y_pos, snap_w, snap_h);
-						
-						/* get possible overlay */
-						const char *overlay_path = fmt("%s/%s_overlay.png", m->m_snapDir.c_str(), platformName);
-						if(fsop_FileExist(overlay_path))
-						{
-							TexHandle.fromImageFile(m->m_game_overlay, overlay_path);
-							m_btnMgr.setTexture(m->m_gameLblOverlay, m->m_game_overlay, x_pos, y_pos, snap_w, snap_h);
-						}
-						else
-							TexHandle.Cleanup(m->m_game_overlay);
-					}
-				}
-			}
-			if(!m->m_snapshot_loaded)
-			{
-				TexHandle.Cleanup(m->m_game_snap);
-				TexHandle.Cleanup(m->m_game_overlay);
-			}
-			/* try to get plugin rom gamesound or just the default plugin gamesound */
-			bool found = false;
-			if(fsop_FileExist(fmt("%s.mp3", game_sound)))
-			{
-				strcat(game_sound, ".mp3");
-				found = true;
-			}
-			else if(fsop_FileExist(fmt("%s.wav", game_sound)))
-			{
-				strcat(game_sound, ".wav");
-				found = true;
-			}
-			else if(fsop_FileExist(fmt("%s.ogg", game_sound)))
-			{
-				strcat(game_sound, ".ogg");
-				found = true;
-			}
-			if(found)
-			{
-				u32 size = 0;
-				u8 *sf = fsop_ReadFile(game_sound, &size);
-				m->m_gameSound.Load(sf, size);
-			}
-			else
-				m->m_gameSound.Load(m_plugin.GetBannerSound(GameHdr->settings[0]), m_plugin.GetBannerSoundSize());
-			if(m->m_gameSound.IsLoaded())
-				m->m_gamesound_changed = true;
-			m->m_soundThrdBusy = false;
-			return NULL;
+			fsop_ReadFileLoc(custom_banner, custom_bnr_size, (void*)custom_bnr_file);
+			m_banner_loaded = true;
 		}
 	}
-	else
+	else /* no custom ID6 or too big, try ID3 */
 	{
-		/* try to get custom banner for wii, gc, and channels */
-		/* check custom ID6 first */
-		strncpy(custom_banner, fmt("%s/%s.bnr", m->m_customBnrDir.c_str(), GameHdr->id), 255);
+		strncpy(custom_banner, fmt("%s/%.3s.bnr", m->m_customBnrDir.c_str(), GameHdr->id), 255);
 		fsop_GetFileSizeBytes(custom_banner, &custom_bnr_size);
 		if(custom_bnr_size > 0)
 		{
@@ -811,20 +588,6 @@ void * CMenu::_gameSoundThread(void *obj)
 			{
 				fsop_ReadFileLoc(custom_banner, custom_bnr_size, (void*)custom_bnr_file);
 				m_banner_loaded = true;
-			}
-		}
-		else /* no custom ID6 or too big, try ID3 */
-		{
-			strncpy(custom_banner, fmt("%s/%.3s.bnr", m->m_customBnrDir.c_str(), GameHdr->id), 255);
-			fsop_GetFileSizeBytes(custom_banner, &custom_bnr_size);
-			if(custom_bnr_size > 0)
-			{
-				custom_bnr_file = (u8*)MEM2_lo_alloc(custom_bnr_size);
-				if(custom_bnr_file != NULL)
-				{
-					fsop_ReadFileLoc(custom_banner, custom_bnr_size, (void*)custom_bnr_file);
-					m_banner_loaded = true;
-				}
 			}
 		}
 	}
@@ -875,11 +638,6 @@ void * CMenu::_gameSoundThread(void *obj)
 	else if(GameHdr->type == TYPE_WII_GAME)
 	{
 		m->_extractBnr(GameHdr);
-		m_banner_loaded = true;
-	}
-	else if(GameHdr->type == TYPE_CHANNEL || GameHdr->type == TYPE_EMUCHANNEL)
-	{
-		ChannelHandle.GetBanner(TITLE_ID(GameHdr->settings[0], GameHdr->settings[1]));
 		m_banner_loaded = true;
 	}
 		

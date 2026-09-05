@@ -287,8 +287,6 @@ bool CMenu::init(bool usb_mounted)
 	m_bckgrndsDir = m_cfg.getString("GENERAL", "dir_backgrounds", fmt("%s/backgrounds", m_dataDir.c_str()));
 	
 	m_sourceDir = m_cfg.getString("GENERAL", "dir_Source", fmt("%s/source_menu", m_dataDir.c_str()));
-	m_pluginsDir = m_cfg.getString("GENERAL", "dir_plugins", fmt("%s/plugins", m_dataDir.c_str()));
-	m_pluginDataDir = m_cfg.getString("GENERAL", "dir_plugins_data", fmt("%s/plugins_data", m_dataDir.c_str()));
 	m_cartDir = m_cfg.getString("GENERAL", "dir_cart", fmt("%s/cart_disk", m_dataDir.c_str()));
 	m_snapDir = m_cfg.getString("GENERAL", "dir_snap", fmt("%s/snapshots", m_dataDir.c_str()));
 
@@ -319,8 +317,6 @@ bool CMenu::init(bool usb_mounted)
 	fsop_MakeFolder(m_bckgrndsDir.c_str());
 
 	fsop_MakeFolder(m_sourceDir.c_str());
-	fsop_MakeFolder(m_pluginsDir.c_str());
-	fsop_MakeFolder(m_pluginDataDir.c_str());
 	fsop_MakeFolder(m_cartDir.c_str());
 	fsop_MakeFolder(m_snapDir.c_str());
 	
@@ -368,31 +364,6 @@ bool CMenu::init(bool usb_mounted)
 	/* load misc config files */
 	m_cat.load(fmt("%s/" CAT_FILENAME, m_settingsDir.c_str()));
 	m_gcfg1.load(fmt("%s/" GAME_SETTINGS1_FILENAME, m_settingsDir.c_str()));
-	m_platform.load(fmt("%s/platform.ini", m_pluginDataDir.c_str()));
-	
-	/* Init plugins */
-	m_plugin.init(m_pluginsDir);
-	vector<string> magics = m_cfg.getStrings(PLUGIN_DOMAIN, "enabled_plugins", ',');
-	if(magics.size() > 0)
-	{
-		enabledPluginsCount = 0;
-		string enabledMagics;
-		for(u8 i = 0; i < magics.size(); i++)
-		{
-			u8 pos = m_plugin.GetPluginPosition(strtoul(magics[i].c_str(), NULL, 16));
-			if(pos < 255)
-			{
-				enabledPluginsCount++;
-				m_plugin.SetEnablePlugin(pos, 2);
-				if(enabledPluginsCount == 1)
-					enabledMagics = magics[i];
-				else
-					enabledMagics.append(',' + magics[i]);
-			}
-		}
-		m_cfg.setString(PLUGIN_DOMAIN, "enabled_plugins", enabledMagics);
-		magics.clear();
-	}
 	
 	/* Set wiiflow language */
 	const char *defLang = "Default";
@@ -441,8 +412,7 @@ bool CMenu::init(bool usb_mounted)
 	}
 
 	/* Init gametdb and custom titles for game list making */
-	m_cacheList.Init(m_settingsDir.c_str(), m_loc.getString(m_curLanguage, "gametdb_code", "EN").c_str(), m_pluginDataDir.c_str(),
-			 m_cfg.getString(CONFIG_FILENAME_SKIP_DOMAIN, CONFIG_FILENAME_SKIP_KEY, CONFIG_FILENAME_SKIP_DEFAULT));
+	m_cacheList.Init(m_settingsDir.c_str(), m_loc.getString(m_curLanguage, "gametdb_code", "EN").c_str());
 
 	/* Coverflow init */
 	CoverFlow.init(m_base_font, m_base_font_size, m_vid.vid_50hz());
@@ -495,9 +465,8 @@ void CMenu::cleanup()
 	_stopSounds();
 	MusicPlayer.Cleanup();
 	_cleanupDefaultFont();
-	CoverFlow.shutdown(); /* possibly plugin flow crash so cleanup early */
+	CoverFlow.shutdown();
 	m_banner.DeleteBanner();
-	m_plugin.Cleanup();
 	m_source.save(true);
 	m_platform.unload();
 	m_loc.unload();
@@ -1662,136 +1631,33 @@ void CMenu::_initCF(void)
 	CoverFlow.clear();
 	CoverFlow.reserve(m_gameList.size());
 
-	char cfgKey1[74];
-	char cfgKey2[74];
-	char catKey1[64];
-	char catKey2[64];
-	
-	// filter list based on categories, favorites, and adult only
+	char cfgKey[16];
+	char catKey[16];
+
 	for(vector<dir_discHdr>::iterator hdr = m_gameList.begin(); hdr != m_gameList.end(); ++hdr)
 	{
-		if(m_sourceflow)
-		{
-			if(!m_source.getBool(sfmt("button_%i", hdr->settings[0]), "hidden", false))
-				CoverFlow.addItem(&(*hdr), 0, 0);// no filtering for sourceflow
-			continue;
-		}
-		
-		string favDomain = "FAVORITES";
-		string adultDomain = "ADULTONLY";
-		string playcntDomain = "PLAYCOUNT";
-		string lastplayDomain = "LASTPLAYED";
-		
-		if(hdr->type == TYPE_PLUGIN)
-		{
-			favDomain = "FAVORITES_PLUGINS";
-			adultDomain = "ADULTONLY_PLUGINS";
-			string playcntDomain = "PLAYCOUNT_PLUGINS";
-			string lastplayDomain = "LASTPLAYED_PLUGINS";
-		}
-		
-		// 1 is the one used. 2 is a temp copied to 1.
-		string catDomain1 = "";
-		string catDomain2 = "";
-		memset(catKey1, 0, 64);
-		memset(catKey2, 0, 64);
-		memset(cfgKey1, 0, 74);
-		memset(cfgKey2, 0, 74);
-		
-		if(hdr->type == TYPE_HOMEBREW)
-		{
-			wcstombs(cfgKey1, hdr->title, 63);// uses title which is the folder name in apps.
-			wcstombs(catKey1, hdr->title, 63);
-		}
-		else if(hdr->type == TYPE_PLUGIN)
-		{
-			strncpy(m_plugin.PluginMagicWord, fmt("%08x", hdr->settings[0]), 8);
-			
-			// old pre 5.4.4 method which uses plugin magic/title of game
-			if(strrchr(hdr->path, '/') != NULL)
-				wcstombs(catKey1, hdr->title, 63);
-			else
-				memcpy(catKey1, hdr->path, 63);// scummvm
-			strcpy(cfgKey1, fmt("%s/%s", m_plugin.PluginMagicWord, catKey1));
-			
-			// if game has an id from the plugin database we use the new method which uses platform name/id
-			if(strcmp(hdr->id, "PLUGIN") != 0 && !m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "").empty())
-			{
-				strcpy(cfgKey2, fmt("%s/%s", m_platform.getString("PLUGINS", m_plugin.PluginMagicWord).c_str(), hdr->id));
-				if(m_gcfg1.has(favDomain, cfgKey1) && !m_gcfg1.has(favDomain, cfgKey2))// convert old [DOMAIN] key= to new [DOMAIN] key=
-				{
-					m_gcfg1.setString(favDomain, cfgKey2, m_gcfg1.getString(favDomain, cfgKey1));
-					m_gcfg1.remove(favDomain, cfgKey1);// remove old method from cfg1
-				}
-				if(m_gcfg1.has(adultDomain, cfgKey1) && !m_gcfg1.has(adultDomain, cfgKey2))// convert old [DOMAIN] key= to new [DOMAIN] key=
-				{
-					m_gcfg1.setString(adultDomain, cfgKey2, m_gcfg1.getString(adultDomain, cfgKey1));
-					m_gcfg1.remove(adultDomain, cfgKey1);// remove old method from cfg1
-				}
-				strcpy(cfgKey1, cfgKey2);// copy 2 temp to 1 to use.
-			}
-		}
-		else // wii, gc, channels
-		{
-			strcpy(cfgKey1, hdr->id);
-			strcpy(catKey1, hdr->id);
-		}
-		
-		if((!m_favorites || m_gcfg1.getBool(favDomain, cfgKey1, false))
-			&& (!m_locked || !m_gcfg1.getBool(adultDomain, cfgKey1, false)))
+		memset(cfgKey, 0, sizeof(cfgKey));
+		memset(catKey, 0, sizeof(catKey));
+		strncpy(cfgKey, hdr->id, 6);
+		strncpy(catKey, hdr->id, 6);
+
+		if((!m_favorites || m_gcfg1.getBool("FAVORITES", cfgKey, false))
+			&& (!m_locked || !m_gcfg1.getBool("ADULTONLY", cfgKey, false)))
 		{
 			string requiredCats = m_cat.getString("GENERAL", "required_categories", "");
 			string selectedCats = m_cat.getString("GENERAL", "selected_categories", "");
 			string hiddenCats = m_cat.getString("GENERAL", "hidden_categories", "");
-			
-			if(hdr->type == TYPE_PLUGIN && m_cat.hasDomain("PLUGINS"))// if using the optional PLUGINS domain for categories_lite.ini
-			{
-				requiredCats = m_cat.getString("PLUGINS", "required_categories", "");
-				selectedCats = m_cat.getString("PLUGINS", "selected_categories", "");
-				hiddenCats = m_cat.getString("PLUGINS", "hidden_categories", "");
-			}
-			
 			u8 numReqCats = requiredCats.length();
 			u8 numSelCats = selectedCats.length();
 			u8 numHidCats = hiddenCats.length();
-			
-			if(hdr->type == TYPE_CHANNEL)
-				catDomain1 = "NAND";
-			else if(hdr->type == TYPE_EMUCHANNEL)
-				catDomain1 = "CHANNELS";
-			else if(hdr->type == TYPE_GC_GAME)
-				catDomain1 = "GAMECUBE";
-			else if(hdr->type == TYPE_WII_GAME)
-				catDomain1 = "WII";
-			else if(hdr->type == TYPE_HOMEBREW)
-				catDomain1 = "HOMEBREW";
-			else //hdr->type == TYPE_PLUGIN
-			{
-				// old categories method use [MAGIC] and game title as the key.
-				catDomain1 = m_plugin.PluginMagicWord;
-				// catKey1 already set above
-				
-				// if game has an id from the plugin database we use the new method which uses [platform name] and id as the key
-				if(strcmp(hdr->id, "PLUGIN") != 0 && !m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "").empty())
-				{
-					catDomain2 = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord);
-					strcpy(catKey2, hdr->id);
-					if(m_cat.has(catDomain1, catKey1) && !m_cat.has(catDomain2, catKey2))// convert old [DOMAIN] key= to new [DOMAIN] key=
-					{
-						m_cat.setString(catDomain2, catKey2, m_cat.getString(catDomain1, catKey1));
-						m_cat.remove(catDomain1, catKey1);// remove old method from categories cfg
-					}
-					strcpy(catKey1, catKey2);// copy 2 temp to 1 to use.
-					catDomain1 = catDomain2;
-				}
-			}
+			const char *catDomain = (hdr->type == TYPE_GC_GAME) ? "GAMECUBE" : "WII";
 
-			if(numReqCats != 0 || numSelCats != 0 || numHidCats != 0) // if all 0 skip checking cats and show all games
+			if(numReqCats != 0 || numSelCats != 0 || numHidCats != 0)
 			{
-				string idCats= m_cat.getString(catDomain1, catKey1, "");
+				string idCats = m_cat.getString(catDomain, catKey, "");
 				u8 numIdCats = idCats.length();
 				if(numIdCats == 0)
-					m_cat.remove(catDomain1, catKey1);
+					m_cat.remove(catDomain, catKey);
 				bool inaCat = false;
 				bool inHiddenCat = false;
 				int reqMatch = 0;
@@ -1840,7 +1706,6 @@ void CMenu::_initCF(void)
 						}
 					}
 				}
-				//continue; means don't add game to list (don't show)
 				if(inHiddenCat)
 					continue;
 				if(numReqCats != reqMatch)
@@ -1854,27 +1719,21 @@ void CMenu::_initCF(void)
 				}
 			}
 
-			if(dumpGameLst && hdr->type != TYPE_HOMEBREW && strcmp(hdr->id, "PLUGIN") != 0)
-				dump.setWString(catDomain1, catKey1, hdr->title);
+			if(dumpGameLst)
+				dump.setWString(catDomain, catKey, hdr->title);
 
-			if(hdr->type != TYPE_HOMEBREW && strcmp(hdr->id, "PLUGIN") != 0)
-			{
-				int playcount = m_gcfg1.getInt(playcntDomain, cfgKey1, 0);
-				if(playcount == 0)
-					m_gcfg1.remove(playcntDomain, cfgKey1);
-				unsigned int lastPlayed = m_gcfg1.getUInt(lastplayDomain, cfgKey1, 0);
-				if(lastPlayed == 0)
-					m_gcfg1.remove("lastplayDomain", cfgKey1);
-				CoverFlow.addItem(&(*hdr), playcount, lastPlayed);
-			}
-			else
-				CoverFlow.addItem(&(*hdr), 0, 0);
+			int playcount = m_gcfg1.getInt("PLAYCOUNT", cfgKey, 0);
+			if(playcount == 0)
+				m_gcfg1.remove("PLAYCOUNT", cfgKey);
+			unsigned int lastPlayed = m_gcfg1.getUInt("LASTPLAYED", cfgKey, 0);
+			if(lastPlayed == 0)
+				m_gcfg1.remove("LASTPLAYED", cfgKey);
+			CoverFlow.addItem(&(*hdr), playcount, lastPlayed);
 		}
-		/* remove them if false to keep file short */
-		if(!m_gcfg1.getBool(favDomain, cfgKey1))
-			m_gcfg1.remove(favDomain, cfgKey1);
-		if(!m_gcfg1.getBool(adultDomain, cfgKey1))
-			m_gcfg1.remove(adultDomain, cfgKey1);
+		if(!m_gcfg1.getBool("FAVORITES", cfgKey))
+			m_gcfg1.remove("FAVORITES", cfgKey);
+		if(!m_gcfg1.getBool("ADULTONLY", cfgKey))
+			m_gcfg1.remove("ADULTONLY", cfgKey);
 	}
 
 	if(CoverFlow.empty())
@@ -1892,138 +1751,19 @@ void CMenu::_initCF(void)
 	/*********************** sort coverflow list ***********************/
 	CoverFlow.setSorting((Sorting)m_cfg.getInt(_domainFromView(), "sort", 0));
 	
-	/*********************** set box mode and small box mode **************************/
-	if(!m_sourceflow)
-	{
-		if(m_current_view == COVERFLOW_HOMEBREW)
-		{
-			CoverFlow.setBoxMode(m_cfg.getBool(HOMEBREW_DOMAIN, "box_mode", true));
-			CoverFlow.setSmallBoxMode(m_cfg.getBool(HOMEBREW_DOMAIN, "smallbox", false));
-		}
-		else if(m_current_view == COVERFLOW_PLUGIN)
-		{
-			if(enabledPluginsCount == 1)// only one plugin enabled
-			{
-				if(m_plugin.GetEnabledStatus(HB_PMAGIC))// homebrew plugin
-				{
-					CoverFlow.setBoxMode(m_cfg.getBool(HOMEBREW_DOMAIN, "box_mode", true));
-					CoverFlow.setSmallBoxMode(m_cfg.getBool(HOMEBREW_DOMAIN, "smallbox", false));
-				}
-				else 
-				{
-					s8 bm = -1;
-					for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-					{
-						if(m_plugin.GetEnabledStatus(i))
-						{
-							bm = m_plugin.GetBoxMode(i);
-							break;
-						}
-					}
-					if(bm < 0)// if negative then use default setting
-						CoverFlow.setBoxMode(m_cfg.getBool("GENERAL", "box_mode", true));
-					else 
-						CoverFlow.setBoxMode(bm == 0 ? false : true);
-					CoverFlow.setSmallBoxMode(false);
-				}
-			}
-			else // more than 1 plugin enabled
-			{
-				s8 bm1 = -1;
-				s8 bm2 = -1;
-				bool all_same = true;
-				for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-				{
-					if(m_plugin.GetEnabledStatus(i))
-					{
-						if(bm1 == -1)
-						{
-							bm1 = m_plugin.GetBoxMode(i);
-							if(bm1 < 0)
-								bm1 = m_cfg.getBool("GENERAL", "box_mode", true) ? 1 : 0;
-						}
-						else
-						{
-							bm2 = m_plugin.GetBoxMode(i);
-							if(bm2 < 0)
-								bm2 = m_cfg.getBool("GENERAL", "box_mode", true) ? 1 : 0;
-							if(bm2 != bm1)
-							{
-								all_same = false;
-								break;
-							}
-						}
-					}
-				}
-				if(!all_same)
-					CoverFlow.setBoxMode(m_cfg.getBool("GENERAL", "box_mode", true));
-				else
-					CoverFlow.setBoxMode(bm1 == 0 ? false : true);
-				CoverFlow.setSmallBoxMode(false);
-			}
-		}
-		else
-		{
-			CoverFlow.setBoxMode(m_cfg.getBool("GENERAL", "box_mode", true));
-			CoverFlow.setSmallBoxMode(false);
-		}
-	}
-	else // sourceflow
-	{
-		CoverFlow.setBoxMode(m_cfg.getBool(SOURCEFLOW_DOMAIN, "box_mode", true));
-		CoverFlow.setSmallBoxMode(m_cfg.getBool(SOURCEFLOW_DOMAIN, "smallbox", false));
-	}
+	CoverFlow.setBoxMode(m_cfg.getBool("GENERAL", "box_mode", true));
+	CoverFlow.setSmallBoxMode(false);
 	
 	/*********************** Setup coverflow covers settings ***********************/
 	CoverFlow.setBufferSize(m_cfg.getInt("GENERAL", "cover_buffer", 20));
 	CoverFlow.setHQcover(m_cfg.getBool("GENERAL", "cover_use_hq", false));
 	CoverFlow.start(m_imgsDir);
 	
-	/*********************** Get and set game list current item to center cover **************************/
 	if(!CoverFlow.empty())
 	{
-		/* get ID or filename or source number of center cover */
-		string ID = "", filename = "";
-		u32 sourceNumber = 0;
-		if(m_current_view == COVERFLOW_PLUGIN && !m_sourceflow)
-		{
-			if(!m_plugin.GetEnabledStatus(m_cfg.getString(PLUGIN_DOMAIN, "cur_magic", "00000000").c_str()))
-			{
-				for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-				{
-					if(m_plugin.GetEnabledStatus(i))
-					{
-						m_cfg.setString(PLUGIN_DOMAIN, "cur_magic", sfmt("%08x", m_plugin.GetPluginMagic(i)));
-						break;
-					}
-				}
-			}
-
-			strncpy(m_plugin.PluginMagicWord, m_cfg.getString(PLUGIN_DOMAIN, "cur_magic").c_str(), 8);
-			
-			if(strncasecmp(m_plugin.PluginMagicWord, GC_PMAGIC, 8) == 0)//NGCM
-				ID = m_cfg.getString("plugin_item", m_plugin.PluginMagicWord, "");
-			else if(strncasecmp(m_plugin.PluginMagicWord, WII_PMAGIC, 8) == 0)//NWII
-				ID = m_cfg.getString("plugin_item", m_plugin.PluginMagicWord, "");
-			else if(strncasecmp(m_plugin.PluginMagicWord, NAND_PMAGIC, 8) == 0)//NAND
-				ID = m_cfg.getString("plugin_item", m_plugin.PluginMagicWord, "");
-			else if(strncasecmp(m_plugin.PluginMagicWord, ENAND_PMAGIC, 8) == 0)//EMUNAND
-				ID = m_cfg.getString("plugin_item", m_plugin.PluginMagicWord, "");
-			else
-				filename = m_cfg.getString("plugin_item", m_plugin.PluginMagicWord, "");// homebrew and plugins
-		}
-		else if(m_sourceflow && sm_numbers.size() > 0)
-			sourceNumber = stoi(sm_numbers[sm_numbers.size() - 1]);
-		else if(m_current_view == COVERFLOW_HOMEBREW) 
-			filename = m_cfg.getString(HOMEBREW_DOMAIN, "current_item", "");
-		else
-			ID = m_cfg.getString(_domainFromView(), "current_item", "");
-			
-		/* set center cover as coverflow current position */
-		if(!CoverFlow._setCurPosToCurItem(ID.c_str(), filename.c_str(), sourceNumber, true))
-			CoverFlow._setCurPos(0);// if not found set first cover as coverflow current position
-			
-		/************************** create and start the cover loader thread *************************/
+		string ID = m_cfg.getString(_domainFromView(), "current_item", "");
+		if(!CoverFlow._setCurPosToCurItem(ID.c_str(), "", 0, true))
+			CoverFlow._setCurPos(0);
 		CoverFlow.startCoverLoader();
 	}
 }
@@ -2034,20 +1774,6 @@ bool CMenu::_loadList(void)
 	m_gameList.clear();
 	vector<dir_discHdr>().swap(m_gameList);
 	NANDemuView = false;
-	
-	if(m_sourceflow)
-	{
-		m_cacheList.createSFList(m_max_source_btn, m_source, m_sourceDir);
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-			m_gameList.push_back(*tmp_itr);
-		m_cacheList.Clear();
-		if(SF_cacheCovers)
-		{
-			SF_cacheCovers = false;
-			cacheCovers = true;
-		}
-		return true;
-	}
 	gprintf("Creating Gamelist\n");
 	/* Kids UI: Wii and GameCube only. */
 	if(m_current_view & COVERFLOW_WII)
@@ -2096,26 +1822,6 @@ bool CMenu::_loadWiiList(void)
 	return true;
 }
 
-bool CMenu::_loadHomebrewList(const char *HB_Dir)
-{
-	currentPartition = m_cfg.getInt(HOMEBREW_DOMAIN, "partition", SD);
-	if(!DeviceHandle.IsInserted(currentPartition))
-		return false;
-
-	gprintf("Adding homebrew list\n");
-	string gameDir(fmt("%s:/%s", DeviceName[currentPartition], HB_Dir));
-	string cacheDir(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], HB_Dir));
-	bool updateCache = m_cfg.getBool(HOMEBREW_DOMAIN, "update_cache");
-	bool preCachedList = fsop_FileExist(cacheDir.c_str());
-	m_cacheList.CreateList(COVERFLOW_HOMEBREW, gameDir, stringToVector(".dol|.elf", '|'), cacheDir, updateCache);
-	m_cfg.remove(HOMEBREW_DOMAIN, "update_cache");
-	for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-		m_gameList.push_back(*tmp_itr);
-	if(updateCache || (!preCachedList && fsop_FileExist(cacheDir.c_str())))
-		cacheCovers = true;
-	return true;
-}
-
 bool CMenu::_loadGamecubeList()
 {
 	gprintf("Adding gamecube list\n");
@@ -2148,152 +1854,6 @@ bool CMenu::_loadGamecubeList()
 		if(!preCachedList && fsop_FileExist(cacheDir.c_str()))
 			cacheCovers = true;
 	}
-	return true;
-}
-
-bool CMenu::_loadChannelList(void)
-{
-	u8 chantypes = m_cfg.getUInt(CHANNEL_DOMAIN, "channels_type", CHANNELS_REAL);
-	if(chantypes < CHANNELS_REAL || chantypes > CHANNELS_BOTH)
-	{
-		m_cfg.setUInt(CHANNEL_DOMAIN, "channels_type", CHANNELS_REAL);
-		chantypes = CHANNELS_REAL;
-	}
-	bool updateCache = m_cfg.getBool(CHANNEL_DOMAIN, "update_cache");
-	m_cfg.remove(CHANNEL_DOMAIN, "update_cache");
-	vector<string> NullVector;
-	if(chantypes & CHANNELS_REAL)
-	{
-		gprintf("Adding real nand list\n");
-		NANDemuView = false;
-		if(updateCache)
-			cacheCovers = true;// real nand channels list is not cached but covers may still need to be updated
-		m_cacheList.CreateList(COVERFLOW_CHANNEL, std::string(), NullVector, std::string(), false);
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-			m_gameList.push_back(*tmp_itr);
-	}
-	if(chantypes & CHANNELS_EMU)
-	{
-		NANDemuView = true;
-		int emuPartition = _FindEmuPart(EMU_NAND, false);// check if emunand folder exist and on FAT
-		if(emuPartition >= 0)
-		{
-			gprintf("Adding emu nand list\n");
-			currentPartition = emuPartition;
-			string cacheDir = fmt("%s/%s_channels.db", m_listCacheDir.c_str(), DeviceName[currentPartition]);
-			bool preCachedList = fsop_FileExist(cacheDir.c_str());
-			m_cacheList.CreateList(COVERFLOW_CHANNEL, std::string(), NullVector, cacheDir, updateCache);
-			for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-				m_gameList.push_back(*tmp_itr);
-			if(updateCache || (!preCachedList && fsop_FileExist(cacheDir.c_str())))
-				cacheCovers = true;
-		}
-	}
-	return true;
-}
-
-bool CMenu::_loadPluginList()
-{
-	bool updateCache = m_cfg.getBool(PLUGIN_DOMAIN, "update_cache");
-	gprintf("Adding plugins list\n");
-	bool channels_done = false;
-	for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-	{
-		if(!m_plugin.GetEnabledStatus(i))
-			continue;
-		int romsPartition = m_plugin.GetRomPartition(i);
-		if(romsPartition < 0)
-			romsPartition = m_cfg.getInt(PLUGIN_DOMAIN, "partition", 0);
-		currentPartition = romsPartition;
-		if(!DeviceHandle.IsInserted(currentPartition))
-			continue;
-		strncpy(m_plugin.PluginMagicWord, fmt("%08x", m_plugin.GetPluginMagic(i)), 8);
-		const char *romDir = m_plugin.GetRomDir(i);
-		if(strstr(romDir, "scummvm.ini") == NULL)
-		{
-			if(strncasecmp(m_plugin.PluginMagicWord, HB_PMAGIC, 6) == 0)//HBRW
-			{
-				if(updateCache)
-					m_cfg.setBool(HOMEBREW_DOMAIN, "update_cache", true);
-				_loadHomebrewList(romDir);
-			}
-			else if(strncasecmp(m_plugin.PluginMagicWord, GC_PMAGIC, 8) == 0)//NGCM
-			{
-				if(updateCache)
-					m_cfg.setBool(GC_DOMAIN, "update_cache", true);
-				_loadGamecubeList();
-			}
-			else if(strncasecmp(m_plugin.PluginMagicWord, WII_PMAGIC, 8) == 0)//NWII
-			{
-				if(updateCache)
-					m_cfg.setBool(WII_DOMAIN, "update_cache", true);
-				_loadWiiList();
-			}
-			else if(!channels_done && (strncasecmp(m_plugin.PluginMagicWord, NAND_PMAGIC, 8) == 0 || strncasecmp(m_plugin.PluginMagicWord, ENAND_PMAGIC, 8) == 0))//NAND
-			{
-				channels_done = true;
-				if(updateCache)
-					m_cfg.setBool(CHANNEL_DOMAIN, "update_cache", true);
-				_loadChannelList();
-			}
-			else
-			{
-				string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-				bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-				
-				string romsDir(fmt("%s:/%s", DeviceName[currentPartition], romDir));
-				vector<string> FileTypes = stringToVector(m_plugin.GetFileTypes(i), '|');
-				m_cacheList.Color = m_plugin.GetCaseColor(i);
-				m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-				m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-				
-				string platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "");
-				if(!platformName.empty())
-				{
-					/* check COMBINED for platform names that mean the same system just different region */
-					/* some platforms have different names per country (ex. Genesis/Megadrive) */
-					/* but we use only one platform name for both */
-					string newName = m_platform.getString("COMBINED", platformName, "");
-					if(newName.empty())
-						m_platform.remove("COMBINED", platformName);
-					else
-						platformName = newName;
-				}
-				
-				m_cacheList.CreateRomList(platformName.c_str(), romsDir, FileTypes, cachedListFile, updateCache);
-				
-				for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-					m_gameList.push_back(*tmp_itr);
-				if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
-					cacheCovers = true;
-			}
-		}
-		else
-		{
-			string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-			bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-			
-			Config scummvm;
-			if(strchr(romDir, ':') == NULL || !fsop_FileExist(romDir))
-				scummvm.load(fmt("%s/%s", m_pluginsDir.c_str(), romDir));
-			else
-				scummvm.load(romDir);
-			// should add error msg if loading scummvm fails or is not found
-			string platformName = "";
-			if(m_platform.loaded())/* convert plugin magic to platform name */
-				platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord);
-			m_cacheList.Color = m_plugin.GetCaseColor(i);
-			m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-			m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-			m_cacheList.ParseScummvmINI(scummvm, DeviceName[currentPartition], m_pluginDataDir.c_str(), platformName.c_str(), cachedListFile, updateCache);
-			for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-				m_gameList.push_back(*tmp_itr);
-			if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
-				cacheCovers = true;
-			scummvm.unload();
-		}
-	}
-	m_cfg.remove(PLUGIN_DOMAIN, "update_cache");
 	return true;
 }
 
@@ -2443,22 +2003,8 @@ void CMenu::_cleanupDefaultFont()
 
 const char *CMenu::_domainFromView()
 {
-	if(m_sourceflow)
-		return SOURCEFLOW_DOMAIN;
-	switch(m_current_view)
-	{
-		case COVERFLOW_CHANNEL:
-			return CHANNEL_DOMAIN;
-		case COVERFLOW_HOMEBREW:
-			return HOMEBREW_DOMAIN;
-		case COVERFLOW_GAMECUBE:
-			return GC_DOMAIN;
-		case COVERFLOW_PLUGIN:
-			return PLUGIN_DOMAIN;
-		default:
-			return WII_DOMAIN;
-	}
-	return "NULL";
+	/* Kids UI is one combined Wii+GC coverflow; layout/sort state lives on WII. */
+	return WII_DOMAIN;
 }
 
 void CMenu::RemoveCover(const char *id)
@@ -2502,106 +2048,19 @@ void CMenu::TempLoadIOS(int IOS)
 static char blankCoverPath[MAX_FAT_PATH];
 const char *CMenu::getBlankCoverPath(const dir_discHdr *element)
 {
-	string blankCoverTitle = "wii";
-	if(m_platform.loaded())
-	{
-		switch(element->type)
-		{
-			case TYPE_CHANNEL:
-				strncpy(m_plugin.PluginMagicWord, NAND_PMAGIC, 9);
-				break;
-			case TYPE_EMUCHANNEL:
-				strncpy(m_plugin.PluginMagicWord, ENAND_PMAGIC, 9);
-				break;
-			case TYPE_HOMEBREW:
-				strncpy(m_plugin.PluginMagicWord, HB_PMAGIC, 9);
-				break;
-			case TYPE_GC_GAME:
-				strncpy(m_plugin.PluginMagicWord, GC_PMAGIC, 9);
-				break;
-			case TYPE_PLUGIN:
-				strncpy(m_plugin.PluginMagicWord, fmt("%08x", element->settings[0]), 8);
-				break;
-			default:// wii
-				strncpy(m_plugin.PluginMagicWord, WII_PMAGIC, 9);
-		}
-		blankCoverTitle = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "wii");
-	}
-	snprintf(blankCoverPath, sizeof(blankCoverPath), "%s/blank_covers/%s.png", m_boxPicDir.c_str(), blankCoverTitle.c_str());
+	const char *blankCoverTitle = (element->type == TYPE_GC_GAME) ? "gamecube" : "wii";
+	snprintf(blankCoverPath, sizeof(blankCoverPath), "%s/blank_covers/%s.png", m_boxPicDir.c_str(), blankCoverTitle);
 	if(!fsop_FileExist(blankCoverPath))
-		snprintf(blankCoverPath, sizeof(blankCoverPath), "%s/blank_covers/%s.jpg", m_boxPicDir.c_str(), blankCoverTitle.c_str());
+		snprintf(blankCoverPath, sizeof(blankCoverPath), "%s/blank_covers/%s.jpg", m_boxPicDir.c_str(), blankCoverTitle);
 	return blankCoverPath;
 }
 
 const char *CMenu::getBoxPath(const dir_discHdr *element)
 {
-	if(element->type == TYPE_PLUGIN)
-	{
-		const char *filename = fmt("%s", element->path);
-		if(strchr(filename, '/') != NULL)
-		{
-			filename = fmt("%s", strrchr(element->path, '/') + 1);
-		}
-
-		const char *coverFolder = m_plugin.GetCoverFolderName(element->settings[0]);
-		return fmt("%s/%s/%s.png", m_boxPicDir.c_str(), coverFolder, filename);
-	}
-	else if(element->type == TYPE_HOMEBREW)// use folder name for the png name
-		return fmt("%s/homebrew/%s.png", m_boxPicDir.c_str(), strrchr(element->path, '/') + 1);
-	else if(element->type == TYPE_SOURCE)//sourceflow
-	{
-		const char *coverImg = strrchr(element->path, '/') + 1;
-		if(coverImg == NULL)
-			return NULL;
-		return fmt("%s/full_covers/%s", m_sourceDir.c_str(), coverImg);
-	}
 	return fmt("%s/%s.png", m_boxPicDir.c_str(), element->id);
 }
 
 const char *CMenu::getFrontPath(const dir_discHdr *element)
 {
-	if(element->type == TYPE_PLUGIN)
-	{
-		const char *tempname = element->path;
-		if(strchr(element->path, '/') != NULL)
-			tempname = strrchr(element->path, '/') + 1;
-		const char *coverFolder = m_plugin.GetCoverFolderName(element->settings[0]);
-		if(strlen(coverFolder) > 0)
-			return fmt("%s/%s/%s.png", m_picDir.c_str(), coverFolder, tempname);
-		else
-			return fmt("%s/%s.png", m_picDir.c_str(), tempname);
-	}
-	else if(element->type == TYPE_HOMEBREW)
-	{
-		if(m_cfg.getBool(HOMEBREW_DOMAIN, "smallbox"))
-		{
-			const char *coverPath = fmt("%s/homebrew_small/%s.png", m_picDir.c_str(), strrchr(element->path, '/') + 1);
-			if(!fsop_FileExist(coverPath))
-				return fmt("%s/icon.png", element->path);
-			else
-				return coverPath;
-		}
-		else
-			return fmt("%s/homebrew/%s.png", m_picDir.c_str(), strrchr(element->path, '/') + 1);
-	}
-	else if(element->type == TYPE_SOURCE)//sourceflow
-	{
-		const char *coverImg = strrchr(element->path, '/') + 1;
-		if(coverImg == NULL)
-			return NULL;
-		const char *coverPath = fmt("%s/front_covers/%s", m_sourceDir.c_str(), coverImg);
-		if(m_cfg.getBool(SOURCEFLOW_DOMAIN, "smallbox") || !fsop_FileExist(coverPath))
-		{
-			string themeName = m_cfg.getString("GENERAL", "theme", "default");
-			coverPath = fmt("%s/small_covers/%s/%s", m_sourceDir.c_str(), themeName.c_str(), coverImg);
-			if(!fsop_FileExist(coverPath))
-			{
-				coverPath = fmt("%s/small_covers/%s", m_sourceDir.c_str(), coverImg);
-				if(!fsop_FileExist(coverPath))
-					return element->path;
-			}
-		}
-		return coverPath;
-	}
 	return fmt("%s/%s.png", m_picDir.c_str(), element->id);
 }
