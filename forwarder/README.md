@@ -35,3 +35,41 @@ reaches the console, is not.
 
 The safe way to apply these is to swap the two textures inside the released WAD
 and re-sign it, leaving every other structure as shipped.
+
+## Rebuilding the Kids WAD
+
+`tools/` rebuilds the channel from the upstream release WAD. Only two RGBA8
+textures and the IMET channel name change; `banner.brlyt`, `banner_Start.brlan`,
+`banner_Loop.brlan`, `icon.brlyt`, `icon.brlan` and `sound.bin` are carried over
+byte-for-byte, so nothing the System Menu parses structurally was authored here.
+
+    u8.py         U8 archive reader
+    lz.py         Nintendo LZ10 codec (round-trip asserted before use)
+    tpl.py        TPL RGBA8 tiled codec
+    build_wad.py  retexture -> recompress -> IMD5 -> U8 -> IMET
+    pack.py       encrypt, fake-sign the TMD, pack, then verify its own output
+
+Fetch `WiiFlow.Channel.Forwarder.wad` from the upstream releases page as
+`base.wad`, then run `build_wad.py` followed by `pack.py`.
+
+### Format notes worth keeping
+
+Verified against the real file rather than taken from documentation:
+
+- The **IMET MD5 covers `[0x00,0x600)`** with the 16-byte field at `0x5F0`
+  zeroed - not the `[0x40,0x640)` range usually quoted. Using the documented
+  range produces a wrong hash.
+- The TPL codec was validated by re-encoding upstream's own source PNGs and
+  getting **byte-identical** TPLs back, so the encoder matches whatever tool
+  built the originals.
+- The banner already ships **animation and sound**: `banner_Start.brlan`,
+  `banner_Loop.brlan` and a 222,680-byte BNS `sound.bin`.
+
+### Corrections to the community documentation
+
+- Title ID is **`UP2E`** (`00010001-55503245`), **not `DWFA`**. It is in the
+  homebrew-channel range so it is safe to install, but WiiFlow's
+  `[GENERAL] returnto=DWFA` will not match this channel.
+- It requires **IOS35**, not IOS58.
+- Upstream's Chinese IMET name slot reads "Wii Sports + Resort", a leftover from
+  the CustomizeMii base. All ten slots now read "WiiFlow Kids".
