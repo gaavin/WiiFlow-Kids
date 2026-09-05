@@ -120,13 +120,13 @@ def seamless_band(w, h, elements):
     return big.resize((w, h), Image.Resampling.LANCZOS)
 
 
-def bubble(size, ring=0.16):
+def bubble(size, ring=0.19):
     def draw(canvas, x, y):
         r = size * S / 2
         tile = Image.new("L", (int(r * 2.6), int(r * 2.6)), 0)
         d = ImageDraw.Draw(tile)
         c = tile.width / 2
-        d.ellipse([c - r, c - r, c + r, c + r], fill=70)
+        d.ellipse([c - r, c - r, c + r, c + r], fill=95)
         d.ellipse([c - r, c - r, c + r, c + r], outline=255, width=max(2, int(r * ring)))
         hr = r * 0.30
         d.ellipse([c - r * 0.34 - hr, c - r * 0.38 - hr,
@@ -194,10 +194,10 @@ def ia_png(mask, path):
 def scene(w, h):
     """The app's sky-and-reef composition, sized for the banner pane."""
     img = vgrad((w, h), [
-        (0.00, (26, 122, 208)), (0.18, (60, 170, 232)), (0.36, (128, 212, 245)),
-        (0.46, (198, 235, 248)), (0.495, (226, 247, 251)),
-        (0.50, (118, 221, 232)), (0.58, (38, 172, 203)),
-        (0.72, (18, 122, 175)), (0.88, (14, 88, 148)), (1.00, (12, 68, 126)),
+        (0.00, (86, 188, 238)), (0.20, (92, 193, 240)), (0.34, (118, 208, 244)),
+        (0.44, (176, 228, 248)), (0.485, (214, 242, 250)),
+        (0.50, (96, 205, 224)), (0.56, (60, 186, 214)), (0.66, (52, 178, 208)),
+        (0.78, (30, 146, 188)), (0.90, (18, 108, 162)), (1.00, (14, 84, 140)),
     ]).convert("RGBA")
     d = ImageDraw.Draw(img, "RGBA")
 
@@ -308,13 +308,28 @@ def dither565(img):
     return out
 
 
-def wordmark(w, h, pad_scale=1.0):
-    """WiiFlow KIDS, the same lockup the boot splash uses."""
+def wordmark(w, h, fit=0.88):
+    """WiiFlow KIDS, the same lockup the boot splash uses.
+
+    The type is shrunk until the lockup occupies at most `fit` of the
+    texture width. The icon pane scales its 120x48 texture by 1.10, so
+    type drawn edge to edge came back clipped on both sides in the Wii
+    Menu; measuring instead of guessing a point size fixes that for any
+    string length.
+    """
     img = Image.new("RGBA", (w * S, h * S), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    size = int(h * S * 0.46 * pad_scale)
-    f = ImageFont.truetype(str(FONT), size)
     left, right = "WiiFlow", "KIDS"
+    size = int(h * S * 0.46)
+    while size > 6:
+        f = ImageFont.truetype(str(FONT), size)
+        gap = size * 0.28
+        lw = d.textlength(left, font=f)
+        rw = d.textlength(right, font=f)
+        if lw + gap + rw <= w * S * fit:
+            break
+        size -= 1
+    f = ImageFont.truetype(str(FONT), size)
     gap = size * 0.28
     lw = d.textlength(left, font=f)
     rw = d.textlength(right, font=f)
@@ -363,7 +378,7 @@ def main():
     icon_bg.convert("RGBA").save(ROOT / "menubnr_BG.png")
     print("  menubnr_BG.png: 170x96 (pane 170x96, was 2x96)")
 
-    wordmark(120, 48, pad_scale=0.92).save(ROOT / "menubnr_logo.png")
+    wordmark(120, 48, fit=0.80).save(ROOT / "menubnr_logo.png")
     print("  menubnr_logo.png: 120x48")
 
     ia_png(seamless_band(116, 32, [
