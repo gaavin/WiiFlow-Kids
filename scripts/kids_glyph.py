@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Kids UI button glyph: the Wii Remote's A button.
+"""Kids UI button glyphs: the Wii Remote's A and B keys.
 
 The stock hint drew a black rounded square with a green A, which is an
 Xbox convention. The Wii Remote's A is a round, slightly domed light key
 with dark grey lettering, so this draws that instead — given the Frutiger
 Aero treatment the rest of the theme uses: a glass dome with a bright
-upper shelf, a cool bounce along the bottom and a white rim.
+upper shelf, a cool bounce along the bottom and a white rim. B is the
+same key with a B, so PLAY and BACK carry a matching pair.
 
-Authored at 128px for a 52px slot (menu_main.cpp MAIN/A_GLYPH) so the GPU
-downsamples it, and compiled into the dol by bin2s alongside the splash.
+Authored at 128px for a 52px (main hint) / 40px (PLAY/BACK) slot so the
+GPU downsamples it, and compiled into the dol by bin2s alongside the splash.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "data" / "images" / "a_button.png"
+IMG = ROOT / "data" / "images"
 FONT = ROOT / "out" / "imgs" / "font.ttf"
 
 W = 128
@@ -46,7 +47,7 @@ def vgrad(size, stops):
     return strip.resize((w, h), Image.Resampling.BICUBIC)
 
 
-def main():
+def wii_letter(letter: str) -> Image.Image:
     img = Image.new("RGBA", (SW, SW), (0, 0, 0, 0))
     c = SW / 2
     r = SW * 0.425
@@ -92,10 +93,17 @@ def main():
     # the letter, in the dark navy the rest of the UI uses for ink
     d = ImageDraw.Draw(img)
     f = ImageFont.truetype(str(FONT), int(SW * 0.50))
-    d.text((c, c + SW * 0.012), "A", font=f, fill=(27, 46, 70, 255), anchor="mm")
+    d.text((c, c + SW * 0.012), letter, font=f, fill=(27, 46, 70, 255), anchor="mm")
 
-    img.resize((W, W), Image.Resampling.LANCZOS).save(OUT, optimize=True)
-    print("wrote", OUT, f"{W}x{W}")
+    return img.resize((W, W), Image.Resampling.LANCZOS)
+
+
+def main():
+    IMG.mkdir(parents=True, exist_ok=True)
+    for letter, name in (("A", "a_button.png"), ("B", "b_button.png")):
+        out = IMG / name
+        wii_letter(letter).save(out, optimize=True)
+        print("wrote", out, f"{W}x{W}")
 
 
 if __name__ == "__main__":

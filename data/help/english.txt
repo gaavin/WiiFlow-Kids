@@ -25,7 +25,6 @@ Controls:
 -- A on Disc Icon (Game Disc in Drive)  =  Launch game disc
 
 - Game:
--- A on box  =  Flip Cover
 -- A out of screen  =  Launch game
 -- A on Star Icon  =  Toggle Favorite (Yellow = Favorite)
 -- A on Categories Icon  =  Set Categories for current game

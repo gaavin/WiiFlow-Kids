@@ -197,7 +197,7 @@ private:
 	
 // Main Coverflow
 	/* Kids UI: every main-screen button is stripped. Only the coverflow and
-	   its page arrows remain; the physical HOME button exits WiiFlow. */
+	   its - / + page keys remain; the physical HOME button exits WiiFlow. */
 	s16 m_mainLblCurMusic;
 	s16 m_mainLblLetter;
 	s16 m_mainLblNotice;
@@ -289,6 +289,8 @@ private:
 	   the game screen - only PLAY and BACK remain. */
 	s16 m_gameBtnPlay;
 	s16 m_gameBtnBack;
+	s16 m_gameLblAGlyph;
+	s16 m_gameLblBGlyph;
 	s16 m_gameLblUser[5];
 	int snapbg_x, snapbg_y, snapbg_w, snapbg_h;
 // disc 2 prompt menu

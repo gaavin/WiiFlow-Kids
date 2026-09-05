@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Kids UI chrome: 9-slice glass capsules and coverflow arrows.
+"""Kids UI chrome: 9-slice glass capsules and coverflow - / + keys.
 
 Rendered at twice the on-screen size. CButtonsMgr::_drawBtn lays the caps
 out as squares of the button's height and stretches the centre strip
 between them (gui.cpp), with UVs spanning the whole texture — so texture
 resolution is free and a 2x source is simply downsampled by the GPU
-instead of being magnified. Same reason the arrows are 160px for an 80px
-slot.
+instead of being magnified. Same reason the - / + keys are 160px for an
+80px slot.
 
 The seam invariant from the first pass still holds: every shading term is
 a function of y alone, so the stretched centre strip cannot band against
@@ -97,8 +97,8 @@ def assert_seam(left, centre, right):
         assert lp[CAP - 1, y] == cp[0, y] == rp[0, y], f"seam mismatch at y={y}"
 
 
-def arrow(point_right, face, edge, size=160):
-    """A round glass button with a fat chevron — a clear target for a kid."""
+def wii_mark(is_plus, face, edge, size=160):
+    """A round glass button with a minus or plus — the Wii Remote - / +."""
     n = 4
     big = Image.new("RGBA", (size * n, size * n), (0, 0, 0, 0))
     d = ImageDraw.Draw(big)
@@ -124,16 +124,29 @@ def arrow(point_right, face, edge, size=160):
     shelf.putalpha(Image.composite(shelf.getchannel("A"), Image.new("L", big.size, 0), mask))
     big.alpha_composite(shelf.filter(ImageFilter.GaussianBlur(r * 0.05)))
 
-    # chevron
-    s = r * 0.46
-    xo = r * 0.10 * (1 if point_right else -1)
-    pts = [(-0.35, -0.75), (0.30, 0.0), (-0.35, 0.75)]
-    if not point_right:
-        pts = [(-x, y) for x, y in pts]
-    line = [(c + xo + x * s, c + y * s) for x, y in pts]
-    d.line(line, fill=(20, 56, 92, 190), width=int(s * 0.62), joint="curve")
-    d.line([(x, y - s * 0.06) for x, y in line], fill=(255, 255, 255, 255),
-           width=int(s * 0.42), joint="curve")
+    # minus is a horizontal bar; plus adds the vertical. Fat rounded caps
+    # so the mark still reads at 80px from a couch. Both navy outlines are
+    # laid down first so the white fill can cover the crossing on a plus.
+    bar_w = r * 0.72
+    bar_h = r * 0.155
+    inset = r * 0.038
+
+    def rounded_bar(horizontal, fill, pad=0.0):
+        if horizontal:
+            box = [c - bar_w + pad, c - bar_h + pad,
+                   c + bar_w - pad, c + bar_h - pad]
+        else:
+            box = [c - bar_h + pad, c - bar_w + pad,
+                   c + bar_h - pad, c + bar_w - pad]
+        d.rounded_rectangle(box, radius=max(1.0, bar_h - pad), fill=fill)
+
+    navy, white = (20, 56, 92, 220), (255, 255, 255, 255)
+    rounded_bar(True, navy)
+    if is_plus:
+        rounded_bar(False, navy)
+    rounded_bar(True, white, inset)
+    if is_plus:
+        rounded_bar(False, white, inset)
     return big.resize((size, size), Image.Resampling.LANCZOS)
 
 
@@ -155,10 +168,10 @@ def main():
         centre.save(OUT / f"but{name}center.png", optimize=True)
         right.save(OUT / f"but{name}right.png", optimize=True)
 
-    arrow(False, (168, 234, 255), (28, 132, 214)).save(OUT / "btnprev.png", optimize=True)
-    arrow(True, (168, 234, 255), (28, 132, 214)).save(OUT / "btnnext.png", optimize=True)
-    arrow(False, (255, 238, 150), (236, 152, 20)).save(OUT / "btnprevs.png", optimize=True)
-    arrow(True, (255, 238, 150), (236, 152, 20)).save(OUT / "btnnexts.png", optimize=True)
+    wii_mark(False, (168, 234, 255), (28, 132, 214)).save(OUT / "btnprev.png", optimize=True)
+    wii_mark(True, (168, 234, 255), (28, 132, 214)).save(OUT / "btnnext.png", optimize=True)
+    wii_mark(False, (255, 238, 150), (236, 152, 20)).save(OUT / "btnprevs.png", optimize=True)
+    wii_mark(True, (255, 238, 150), (236, 152, 20)).save(OUT / "btnnexts.png", optimize=True)
     print("wrote", OUT)
 
 

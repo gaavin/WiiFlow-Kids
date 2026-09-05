@@ -8,6 +8,9 @@
 extern const u8 gc_ogg[];
 extern const u32 gc_ogg_size;
 
+extern const u8 a_button_png[];
+extern const u8 b_button_png[];
+
 bool m_zoom_banner = false;
 bool m_banner_loaded = false;
 s16 m_gameBtnPlayFull;
@@ -50,6 +53,8 @@ void CMenu::_hideGame(bool instant)
 
 	m_btnMgr.hide(m_gameBtnPlay, instant);
 	m_btnMgr.hide(m_gameBtnBack, instant);
+	m_btnMgr.hide(m_gameLblAGlyph, instant);
+	m_btnMgr.hide(m_gameLblBGlyph, instant);
 	m_btnMgr.hide(m_gameBtnPlayFull, instant);
 	m_btnMgr.hide(m_gameBtnBackFull, instant);
 	m_btnMgr.hide(m_gameLblSnapBg, instant);
@@ -137,13 +142,7 @@ bool CMenu::_startVideo()
 void CMenu::_game(bool launch)
 {
 	m_banner_loaded = false;
-	bool coverFlipped = false;
-	int cf_version = 1;
-	string domain;
-	string key;
-	Vector3D v;
-	Vector3D savedv;
-	
+
 	dir_discHdr *hdr = (dir_discHdr*)MEM2_alloc(sizeof(dir_discHdr));
 	memcpy(hdr, CoverFlow.getHdr(), sizeof(dir_discHdr));
 	_setCurrentItem(hdr);
@@ -193,30 +192,6 @@ void CMenu::_game(bool launch)
 			startGameSound = 1;
 			_playGameSound();
 		}
-		/* move and zoom flipped cover */
-		if(coverFlipped)
-		{
-			float step = 0.05f;
-			if(BTN_PLUS_PRESSED || BTN_MINUS_PRESSED)
-			{
-				if(BTN_MINUS_PRESSED)
-					step = -step;
-				v.z = min(max(-15.f, v.z + step), 15.f);
-			}
-			else if(BTN_LEFT_PRESSED || BTN_RIGHT_PRESSED)
-			{
-				if(BTN_RIGHT_PRESSED)
-					step = -step;
-				v.x = min(max(-15.f, v.x + step), 15.f);
-			}
-			else if(BTN_UP_PRESSED || BTN_DOWN_PRESSED)
-			{
-				if(BTN_UP_PRESSED)
-					step = -step;
-				v.y = min(max(-15.f, v.y + step), 15.f);
-			}
-			CoverFlow.setCoverFlipPos(v);
-		}
 		/* exit game menu */
 		if(BTN_HOME_PRESSED)
 		{
@@ -225,24 +200,13 @@ void CMenu::_game(bool launch)
 		}
 		else if(BTN_B_PRESSED)
 		{
-			/* de flip cover */
-			if(coverFlipped)
-			{
-				CoverFlow.flip();
-				coverFlipped = false;
-				m_banner.SetShowBanner(true);
-			}
-			/* exit game selected menu */
-			else
-			{
-				_cleanupBanner();
-				break;
-			}
+			_cleanupBanner();
+			break;
 		}
 		/* Kids UI: d-pad steps between PLAY and BACK. CButtonsMgr::up/down
 		   already do this and bail out while the pointer is live, so aiming the
 		   wiimote at the screen still takes priority. */
-		else if(!coverFlipped && (BTN_UP_PRESSED || BTN_DOWN_PRESSED))
+		else if(BTN_UP_PRESSED || BTN_DOWN_PRESSED)
 		{
 			if(BTN_UP_PRESSED)
 				m_btnMgr.up();
@@ -250,7 +214,7 @@ void CMenu::_game(bool launch)
 				m_btnMgr.down();
 		}
 		/* play or stop a trailer video */
-		else if(BTN_MINUS_PRESSED && !coverFlipped)
+		else if(BTN_MINUS_PRESSED)
 		{
 			if(m_video_playing)
 			{
@@ -282,7 +246,7 @@ void CMenu::_game(bool launch)
 				break;
 			}
 			else if(launch || m_btnMgr.selected(m_gameBtnPlay) || m_btnMgr.selected(m_gameBtnPlayFull) || 
-					(!ShowPointer() && !m_video_playing && !coverFlipped))
+					(!ShowPointer() && !m_video_playing))
 			{
 				_hideGame();
 				if(isWiiVC && (hdr->type == TYPE_WII_GAME || hdr->type == TYPE_EMUCHANNEL))
@@ -308,32 +272,13 @@ void CMenu::_game(bool launch)
 					_showGame();
 				}
 			}
-			else if(!coverFlipped)
-			{
-				/* flip cover if mouse over */
-				for(int chan = WPAD_MAX_WIIMOTES-1; chan >= 0; chan--)
-				{
-					if(CoverFlow.mouseOver(m_cursor[chan].x(), m_cursor[chan].y()))
-					{
-						cf_version = _getCFVersion();
-						domain = fmt("%s_%i_S", cf_domain, cf_version);
-						key = "flip_pos";
-						if(!m_vid.wide())
-							key += "_4_3";
-						v = m_coverflow.getVector3D(domain, key);
-						coverFlipped = true;
-						CoverFlow.flip();
-						m_banner.SetShowBanner(false);
-					}
-				}
-			}
 		}
 		/* Kids UI: once a game is chosen the selection is frozen. The d-pad and
 		   stick no longer walk the coverflow underneath, so the only way out of
 		   this screen is B (back) or A (play). Removing this also removes the
 		   only writer of startGameSound == -10. */
 
-		if(!m_fa.isLoaded() && !coverFlipped && !m_video_playing)
+		if(!m_fa.isLoaded() && !m_video_playing)
 		{
 			if(m_banner_loaded && !m_soundThrdBusy && m_zoom_banner)
 			{
@@ -348,6 +293,8 @@ void CMenu::_game(bool launch)
 				
 				m_btnMgr.hide(m_gameBtnPlay);
 				m_btnMgr.hide(m_gameBtnBack);
+				m_btnMgr.hide(m_gameLblAGlyph);
+				m_btnMgr.hide(m_gameLblBGlyph);
 				for(u8 i = 0; i < ARRAY_SIZE(m_gameLblUser); ++i)
 					if(m_gameLblUser[i] != -1)
 						m_btnMgr.hide(m_gameLblUser[i]);
@@ -358,6 +305,8 @@ void CMenu::_game(bool launch)
 				{
 					m_btnMgr.show(m_gameBtnPlay);
 					m_btnMgr.show(m_gameBtnBack);
+					m_btnMgr.show(m_gameLblAGlyph);
+					m_btnMgr.show(m_gameLblBGlyph);
 					for(u8 i = 0; i < ARRAY_SIZE(m_gameLblUser); ++i)
 						if(m_gameLblUser[i] != -1)
 							m_btnMgr.show(m_gameLblUser[i]);
@@ -366,6 +315,8 @@ void CMenu::_game(bool launch)
 				{
 					m_btnMgr.hide(m_gameBtnPlay);
 					m_btnMgr.hide(m_gameBtnBack);
+					m_btnMgr.hide(m_gameLblAGlyph);
+					m_btnMgr.hide(m_gameLblBGlyph);
 					for(u8 i = 0; i < ARRAY_SIZE(m_gameLblUser); ++i)
 						if (m_gameLblUser[i] != -1)
 							m_btnMgr.hide(m_gameLblUser[i]);
@@ -417,17 +368,13 @@ void CMenu::_game(bool launch)
 			m_btnMgr.hide(m_gameBtnBackFull);
 			m_btnMgr.hide(m_gameBtnPlay);
 			m_btnMgr.hide(m_gameBtnBack);
+			m_btnMgr.hide(m_gameLblAGlyph);
+			m_btnMgr.hide(m_gameLblBGlyph);
 			
 			for(u8 i = 0; i < ARRAY_SIZE(m_gameLblUser); ++i)
 				if(m_gameLblUser[i] != -1)
 					m_btnMgr.hide(m_gameLblUser[i]);
 		}
-	}
-	if(coverFlipped)
-	{
-		m_coverflow.setVector3D(domain, key, savedv);
-		_loadCFLayout(cf_version, true);// true?
-		CoverFlow.applySettings();
 	}
 	m_snapshot_loaded = false;
 	TexData emptyTex;
@@ -459,9 +406,16 @@ void CMenu::_initGameMenu()
 
 	/* Kids UI: PLAY stacked tight over BACK on the right, large enough
 	   for small hands but with only an 8px gap so the pair reads as one
-	   control cluster rather than two distant buttons. */
+	   control cluster rather than two distant buttons. A and B glyphs sit
+	   on the left of each capsule so the child can match the remote. */
 	m_gameBtnPlay = _addButton("GAME/PLAY_BTN", theme.btnFont, L"", 404, 336, 212, 56, theme.btnFontColor);
 	m_gameBtnBack = _addButton("GAME/BACK_BTN", theme.btnFont, L"", 404, 400, 212, 56, theme.btnFontColor);
+	TexData texAButton;
+	TexData texBButton;
+	TexHandle.fromPNG(texAButton, a_button_png);
+	TexHandle.fromPNG(texBButton, b_button_png);
+	m_gameLblAGlyph = _addLabel("GAME/A_GLYPH", theme.btnFont, L"", 412, 344, 40, 40, CColor(0xFFFFFFFF), 0, texAButton);
+	m_gameLblBGlyph = _addLabel("GAME/B_GLYPH", theme.btnFont, L"", 412, 408, 40, 40, CColor(0xFFFFFFFF), 0, texBButton);
 	m_gameBtnBackFull = _addButton("GAME/BACK_FULL_BTN", theme.btnFont, L"", 118, 404, 190, 52, theme.btnFontColor);
 	m_gameBtnPlayFull = _addButton("GAME/PLAY_FULL_BTN", theme.btnFont, L"", 328, 404, 190, 52, theme.btnFontColor);
 	m_gameLblSnapBg = _addLabel("GAME/SNAP_BG", theme.txtFont, L"", 385, 31, 246, 170, theme.txtFontColor, 0, texSnapShotBg);
@@ -479,6 +433,8 @@ void CMenu::_initGameMenu()
 
 	_setHideAnim(m_gameBtnPlay, "GAME/PLAY_BTN", 0, 0, 1.f, -1.f);
 	_setHideAnim(m_gameBtnBack, "GAME/BACK_BTN", 0, 0, 1.f, -1.f);
+	_setHideAnim(m_gameLblAGlyph, "GAME/A_GLYPH", 0, 0, 1.f, -1.f);
+	_setHideAnim(m_gameLblBGlyph, "GAME/B_GLYPH", 0, 0, 1.f, -1.f);
 	_setHideAnim(m_gameBtnPlayFull, "GAME/PLAY_FULL_BTN", 0, 0, 1.f, 0.f);
 	_setHideAnim(m_gameBtnBackFull, "GAME/BACK_FULL_BTN", 0, 0, 1.f, 0.f);
 	_setHideAnim(m_gameLblSnapBg, "GAME/SNAP_BG", 0, 0, 1.f, 1.f);

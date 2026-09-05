@@ -252,9 +252,9 @@ int CMenu::main(void)
 		}
 		else if(BTN_A_PRESSED)
 		{
-			if(m_btnMgr.selected(m_mainBtnPrev))// A on prev icon - move back a screen of covers
+			if(m_btnMgr.selected(m_mainBtnPrev))// A on - key - move back a screen of covers
 				CoverFlow.pageUp();
-		 	else if(m_btnMgr.selected(m_mainBtnNext))// A on next icon - move forward a screen of covers
+		 	else if(m_btnMgr.selected(m_mainBtnNext))// A on + key - move forward a screen of covers
 				CoverFlow.pageDown();
 			else if(!CoverFlow.empty() && CoverFlow.select())
 			{
