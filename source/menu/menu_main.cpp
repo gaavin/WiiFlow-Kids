@@ -369,9 +369,11 @@ int CMenu::main(void)
 	wstringEx curLetter;
 	string prevTheme = m_themeName;
 	m_reload = false;
-	/* Kids UI: 1/2 cycle the three remaining layouts. The packed
-	   11- and 21-cover walls are no longer in the rotation. */
+	/* Kids UI: 1/2 still cycle layouts during a session, but every boot
+	   opens on layout 1 (the seven-cover wheel). */
 	CFLocked = false;
+	m_cfg.setInt(WII_DOMAIN, "last_cf_mode", 1);
+	m_cfg.setInt(GC_DOMAIN, "last_cf_mode", 1);
 	/* Kids UI: never fade icons in and out on hover - a child should not have
 	   to discover controls by waving the pointer around. */
 	Auto_hide_icons = false;
