@@ -43,8 +43,13 @@ def _clamp4(v):
     return -8 if v < -8 else (7 if v > 7 else v)
 
 
-def encode(pcm):
-    """pcm: list of int16. Returns (frames_bytes, flat_coef_list)."""
+def encode(pcm, bank=None):
+    """pcm: list of int16. Returns (frames_bytes, flat_coef_list).
+
+    bank overrides the built-in predictors, so a stream can be encoded
+    against coefficients that already live in a known-good header.
+    """
+    table = bank if bank is not None else COEFS
     out = bytearray()
     yn1 = yn2 = 0
     n = len(pcm)
@@ -53,7 +58,7 @@ def encode(pcm):
         block += [0] * (SAMPLES_PER_FRAME - len(block))
 
         best = None
-        for pi, (a1, a2) in enumerate(COEFS):
+        for pi, (a1, a2) in enumerate(table):
             # smallest scale that keeps every residual inside 4 bits
             scale = 0
             while scale < 16:
@@ -98,7 +103,7 @@ def encode(pcm):
         out.append((pi << 4) | scale)
         for k in range(0, SAMPLES_PER_FRAME, 2):
             out.append((nib[k] << 4) | nib[k + 1])
-    return bytes(out), [c for pair in COEFS for c in pair]
+    return bytes(out), [c for pair in table for c in pair]
 
 
 def decode(data, coefs, count):
