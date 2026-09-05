@@ -18,6 +18,61 @@ def decode_rgba8(d):
                 px[i]=r; px[i+1]=g; px[i+2]=b; px[i+3]=a
     return w,h,bytes(px)
 
+def _header(w, h, fmt):
+    out = bytearray()
+    out += struct.pack('>III', 0x0020AF30, 1, 0x0C)
+    out += struct.pack('>II', 0x14, 0x00)
+    hdr = struct.pack('>HHII', h, w, fmt, 0x40)
+    hdr += struct.pack('>IIII', 0, 0, 1, 1)
+    hdr += struct.pack('>f', 0.0)
+    hdr += bytes([0, 0, 0, 0])
+    out += hdr
+    out += b'\0' * (0x40 - len(out))
+    return out
+
+
+def _px(px, w, h, x, y):
+    if 0 <= x < w and 0 <= y < h:
+        i = (y * w + x) * 4
+        return px[i], px[i + 1], px[i + 2], px[i + 3]
+    return 0, 0, 0, 0
+
+
+def encode_rgb565(w, h, px):
+    out = _header(w, h, 4)
+    for ty in range(0, (h + 3) // 4 * 4, 4):
+        for tx in range(0, (w + 3) // 4 * 4, 4):
+            for k in range(16):
+                r, g, b, _ = _px(px, w, h, tx + k % 4, ty + k // 4)
+                v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
+                out += struct.pack('>H', v)
+    return bytes(out)
+
+
+def encode_ia8(w, h, px):
+    """I then A, 4x4 tiles. White glyph in alpha, as the original taglines."""
+    out = _header(w, h, 3)
+    for ty in range(0, (h + 3) // 4 * 4, 4):
+        for tx in range(0, (w + 3) // 4 * 4, 4):
+            for k in range(16):
+                r, g, b, a = _px(px, w, h, tx + k % 4, ty + k // 4)
+                intensity = (r + g + b) // 3
+                out += bytes([intensity, a])
+    return bytes(out)
+
+
+def encode_ia4(w, h, px):
+    """A in the high nibble, I in the low nibble, 8x4 tiles."""
+    out = _header(w, h, 2)
+    for ty in range(0, (h + 3) // 4 * 4, 4):
+        for tx in range(0, (w + 7) // 8 * 8, 8):
+            for k in range(32):
+                r, g, b, a = _px(px, w, h, tx + k % 8, ty + k // 8)
+                intensity = (r + g + b) // 3
+                out += bytes([((a >> 4) << 4) | (intensity >> 4)])
+    return bytes(out)
+
+
 def encode_rgba8(w,h,px):
     """px = RGBA bytes, w*h*4. Returns a complete TPL matching the WiiFlow forwarder layout."""
     out=bytearray()
