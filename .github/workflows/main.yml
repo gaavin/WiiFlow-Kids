@@ -43,20 +43,18 @@ jobs:
 
       - name: Package
         run: |
-          cp -r wii/apps apps
-          mkdir -p apps/wiiflow/
-          cp -r out/bins apps/wiiflow/bins
-          cp -r out/imgs apps/wiiflow/imgs
-          cp out/boot.dol apps/wiiflow/
-          mkdir -p wiiflow
-          cp -r wii/wiiflow/Languages wiiflow/languages
-          cp -r wii/wiiflow/themes_lite wiiflow/themes_lite
+          sudo apt-get install -y zip
+          scripts/package_release.sh "ci-$(git rev-parse --short=7 HEAD)"
           echo "sha=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 
-      - name: Upload binaries
+      - name: Upload SD card payload
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: wiiflow_kids_${{ env.sha }}
-          path: |
-            apps
-            wiiflow
+          path: release/WiiFlow-Kids-ci-${{ env.sha }}/
+
+      - name: Upload release zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiiflow_kids_${{ env.sha }}_zip
+          path: release/WiiFlow-Kids-ci-${{ env.sha }}.zip

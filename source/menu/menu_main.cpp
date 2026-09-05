@@ -62,12 +62,14 @@ void CMenu::_showMain()
 
 void CMenu::_textMain(void)
 {
-	/* same translation key the PLAY button uses, so they always agree,
-	   shown uppercase to match the on-screen hint styling */
-	wstringEx play = _t("gm1", L"Play");
-	for(u32 i = 0; i < play.size(); ++i)
-		play[i] = towupper(play[i]);
-	m_btnMgr.setText(m_mainLblPlayHint, play);
+	/* "Select", not "Play": A opens the game screen, and PLAY is the button
+	   waiting there. cfg16 is the generic Select string, already translated
+	   in most language files, so this stays localised. Uppercased to match
+	   the hint styling. */
+	wstringEx hint = _t("cfg16", L"Select");
+	for(u32 i = 0; i < hint.size(); ++i)
+		hint[i] = towupper(hint[i]);
+	m_btnMgr.setText(m_mainLblPlayHint, hint);
 }
 
 void CMenu::_showTotalGames(const int numberOfGames)

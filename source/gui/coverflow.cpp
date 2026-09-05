@@ -43,6 +43,11 @@ static lwp_t coverLoaderThread = LWP_THREAD_NULL;
 
 static inline int loopNum(int i, int s)
 {
+	/* divw by zero does not trap on PowerPC, it just returns junk, and the
+	   result is used directly as a vector index. An empty list has to fold
+	   to 0 here or the caller walks off into unmapped memory. */
+	if(s <= 0)
+		return 0;
 	return i < 0 ? (s - (-i % s)) % s : i % s;
 }
 
@@ -353,7 +358,14 @@ void CCoverFlow::setRange(u32 rows, u32 columns)
 	{
 		stopCoverLoader();
 		MEM2_free(m_covers);
+		m_covers = NULL;
 		CCover *tmpCovers = (CCover*)MEM2_alloc(sizeof(CCover) * range);
+		if(tmpCovers == NULL)
+		{
+			/* out of MEM2: keep the old geometry rather than run on a null
+			   layout. m_covers stays NULL, which every caller now tests. */
+			return;
+		}
 		for(size_t i = 0; i < range; ++i)
 		{
 			// does not allocate memory -- calls: operator new (sizeof(CCover), tmpCovers+i)
@@ -2022,6 +2034,8 @@ bool CCoverFlow::start(const string &m_imgsDir)
 	if(m_range > 0)
 	{
 		m_covers = (CCover*)MEM2_alloc(sizeof(CCover) * m_range);
+		if(m_covers == NULL)
+			return false;
 		for(size_t i = 0; i < m_range; ++i)
 			m_covers[i] = *(new(m_covers+i) CCover);
 	}
@@ -2855,15 +2869,22 @@ CCoverFlow::CLRet CCoverFlow::_loadCoverTex(u32 i, bool box, bool hq, bool blank
 			if(blankCoverPath != NULL && strrchr(blankCoverPath, '/') != NULL)
 				strncpy(wfcTitle, strrchr(blankCoverPath, '/') + 1, sizeof(wfcTitle) - 1);
 			else
+			{
+				free(full_path);
 				return CL_ERROR;
+			}
 		}
 		else
-			strncpy(wfcTitle, fmt("%s", getFilenameId(m_items[i].hdr)), sizeof(wfcTitle) - 1);
-			
+			strncpy(wfcTitle, getFilenameId(m_items[i].hdr), sizeof(wfcTitle) - 1);
+
+		/* snprintf, not fmt(): fmt() hands back a pointer into eight static
+		   buffers shared process-wide behind a racy index, and this runs on
+		   the cover loader thread while the main thread formats constantly.
+		   The path could be overwritten between building it and opening it. */
 		if(m_smallBox)
-			strncpy(full_path, fmt("%s/%s_small.wfc", m_cachePath.c_str(), wfcTitle), MAX_FAT_PATH);
+			snprintf(full_path, MAX_FAT_PATH + 1, "%s/%s_small.wfc", m_cachePath.c_str(), wfcTitle);
 		else
-			strncpy(full_path, fmt("%s/%s.wfc", m_cachePath.c_str(), wfcTitle), MAX_FAT_PATH);
+			snprintf(full_path, MAX_FAT_PATH + 1, "%s/%s.wfc", m_cachePath.c_str(), wfcTitle);
 		DCFlushRange(full_path, MAX_FAT_PATH+1);
 		
 		/* load wfc file */
@@ -2956,16 +2977,26 @@ void * CCoverFlow::_coverLoader(void *obj)
 	u32 i, j;
 	bool hq_req = cf->m_useHQcover;
 	bool cur_pos_hq = false;
-	u32 bufferSize = min(cf->m_numBufCovers * max(2u, cf->m_rows), 80u);
+	u32 bufferSize = max(1u, min(cf->m_numBufCovers * max(2u, cf->m_rows), 80u));
 
 	while(cf->m_loadingCovers)
 	{
+		/* The main thread can empty the list or reallocate the layout while
+		   this runs. Both are indexed below, and loopNum() folds against the
+		   list size, so idle rather than compute an index into nothing. */
+		if(cf->m_items.empty() || cf->m_covers == NULL || cf->m_range == 0)
+		{
+			usleep(1000);
+			continue;
+		}
 		update = cf->m_moved;
 		cf->m_moved = false;
 		firstItem = cf->m_covers[cf->m_range / 2].index;
 		for(j = cf->m_items.size(); j >= bufferSize && !cf->m_moved && update; --j)
 		{
 			i = loopNum((j & 1) ? firstItem - (j + 1) / 2 : firstItem + j / 2, cf->m_items.size());
+			if(i >= cf->m_items.size())
+				break;
 			if(cf->m_items[i].state != STATE_Loading)
 			{
 				LWP_MutexLock(cf->m_mutex);
@@ -2985,6 +3016,8 @@ void * CCoverFlow::_coverLoader(void *obj)
 			for(j = 0; j <= bufferSize && !cf->m_moved && update && ret != CL_NOMEM; ++j)
 			{
 				i = loopNum((j & 1) ? firstItem - (j + 1) / 2 : firstItem + j / 2, cf->m_items.size());
+				if(i >= cf->m_items.size())
+					break;
 				cur_pos_hq = (hq_req && i == firstItem);
 				if(!cur_pos_hq && cf->m_items[i].state != STATE_Loading)
 					continue;
